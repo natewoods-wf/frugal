@@ -1,12 +1,15 @@
 package frugal
 
-import "git.apache.org/thrift.git/lib/go/thrift"
+import (
+	"reflect"
+
+	"git.apache.org/thrift.git/lib/go/thrift"
+)
 
 type Invoker func(ctx FContext, arguments, result thrift.TStruct) error
 
-func NewInvoker(svc, name string, trans FTransport, pf *FProtocolFactory, middleware ...ServiceMiddleware) Invoker {
-	// TODO: embed middleware
-	return func(ctx FContext, args, result thrift.TStruct) error {
+func NewInvoker(svc string, name string, trans FTransport, pf *FProtocolFactory, middlewares ...ServiceMiddleware) Invoker {
+	core := func(ctx FContext, args, result thrift.TStruct) error {
 		buffer := NewTMemoryOutputBuffer(trans.GetRequestSizeLimit())
 		oprot := pf.GetProtocol(buffer)
 		if err := oprot.WriteRequestHeader(ctx); err != nil {
@@ -60,5 +63,18 @@ func NewInvoker(svc, name string, trans FTransport, pf *FProtocolFactory, middle
 			return err
 		}
 		return iprot.ReadMessageEnd()
+	}
+
+	// from here down is because middlewares are reflection based
+	return func(ctx FContext, input, result thrift.TStruct) error {
+		base := func(service reflect.Value, method reflect.Method, args Arguments) Results {
+			err := core(args.Context(), input, result)
+			return Results{err}
+		}
+		for _, ware := range middlewares {
+			base = ware(base)
+		}
+		out := base(reflect.ValueOf(svc), reflect.Method{Name: name}, Arguments{ctx})
+		return out.Error()
 	}
 }
