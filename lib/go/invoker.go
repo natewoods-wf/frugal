@@ -8,7 +8,7 @@ import (
 
 type Invoker func(ctx FContext, arguments, result thrift.TStruct) error
 
-func NewInvoker(svc string, name string, trans FTransport, pf *FProtocolFactory, middlewares ...ServiceMiddleware) Invoker {
+func NewInvoker(proxiedHandler, method interface{}, name string, trans FTransport, pf *FProtocolFactory, middlewares ...ServiceMiddleware) Invoker {
 	core := func(ctx FContext, args, result thrift.TStruct) error {
 		buffer := NewTMemoryOutputBuffer(trans.GetRequestSizeLimit())
 		oprot := pf.GetProtocol(buffer)
@@ -65,6 +65,14 @@ func NewInvoker(svc string, name string, trans FTransport, pf *FProtocolFactory,
 		return iprot.ReadMessageEnd()
 	}
 
+	// TODO: not use reflect method, just use the name for logging.
+	// TODO: don't use svc either, just the name of the service for logging.
+	reflectMethod := reflect.Method{
+		Name: name,
+		Type: reflect.TypeOf(method),
+		Func: reflect.ValueOf(method),
+	}
+
 	// from here down is because middlewares are reflection based
 	return func(ctx FContext, input, result thrift.TStruct) error {
 		base := func(service reflect.Value, method reflect.Method, args Arguments) Results {
@@ -74,7 +82,7 @@ func NewInvoker(svc string, name string, trans FTransport, pf *FProtocolFactory,
 		for _, ware := range middlewares {
 			base = ware(base)
 		}
-		out := base(reflect.ValueOf(svc), reflect.Method{Name: name}, Arguments{ctx})
+		out := base(reflect.ValueOf(proxiedHandler), reflectMethod, Arguments{ctx})
 		return out.Error()
 	}
 }
