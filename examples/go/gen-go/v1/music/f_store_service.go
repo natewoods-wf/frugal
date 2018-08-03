@@ -81,9 +81,9 @@ type FStoreClientB struct {
 }
 
 func NewFStoreClientB(provider *frugal.FServiceProvider, middleware ...frugal.ServiceMiddleware) *FStoreClientB {
-	return &FStoreClientB{
-		base: frugal.NewFBaseClient(provider, middleware...),
-	}
+	client := &FStoreClientB{}
+	client.base = frugal.NewFBaseClient(client, provider, middleware...)
+	return client
 }
 
 func (f *FStoreClientB) BuyAlbum(ctx frugal.FContext, asin string, acct string) (r *Album, err error) {
@@ -92,7 +92,7 @@ func (f *FStoreClientB) BuyAlbum(ctx frugal.FContext, asin string, acct string) 
 		Acct: acct,
 	}
 	res := StoreBuyAlbumResult{}
-	if err := f.base.Invoke(f, f.BuyAlbum, "buyAlbum", thrift.CALL, ctx, &args, &res); err != nil {
+	if err := f.base.Invoke(f.BuyAlbum, "buyAlbum", thrift.CALL, ctx, &args, &res); err != nil {
 		return StoreBuyAlbumResult_Success_DEFAULT, err
 	}
 	if res.IsSetError() {
@@ -109,7 +109,7 @@ func (f *FStoreClientB) EnterAlbumGiveaway(ctx frugal.FContext, email string, na
 		Name:  name,
 	}
 	res := StoreEnterAlbumGiveawayResult{}
-	if err := f.base.Invoke(f, f.EnterAlbumGiveaway, "enterAlbumGiveaway", thrift.CALL, ctx, &args, &res); err != nil {
+	if err := f.base.Invoke(f.EnterAlbumGiveaway, "enterAlbumGiveaway", thrift.CALL, ctx, &args, &res); err != nil {
 		return StoreEnterAlbumGiveawayResult_Success_DEFAULT, err
 	}
 	return res.GetSuccess(), nil
