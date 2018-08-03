@@ -89,3 +89,23 @@ func NewInvoker(proxiedHandler, method interface{}, name string, trans FTranspor
 		return out.Error()
 	}
 }
+
+type FBaseClient struct {
+	trans FTransport
+	proto *FProtocolFactory
+	warez []ServiceMiddleware
+}
+
+func NewFBaseClient(provider *FServiceProvider, middleware ...ServiceMiddleware) *FBaseClient {
+	return &FBaseClient{
+		trans: provider.GetTransport(),
+		proto: provider.GetProtocolFactory(),
+		warez: append(middleware, provider.GetMiddleware()...),
+	}
+}
+
+func (client *FBaseClient) Invoke(proxiedHandler, method interface{}, name string, typeID thrift.TMessageType, ctx FContext, arguments, result thrift.TStruct) error {
+	// TODO: iff we go this route, move invoker code here, and remove the concept of an invoker
+	in := NewInvoker(proxiedHandler, method, name, client.trans, client.proto, typeID, client.warez)
+	return in(ctx, arguments, result)
+}

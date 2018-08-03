@@ -72,6 +72,49 @@ func (f *FStoreClient) EnterAlbumGiveaway(ctx frugal.FContext, email string, nam
 	return res.GetSuccess(), nil
 }
 
+// Services are the API for client and server interaction.
+// Users can buy an album or enter a giveaway for a free album.
+//
+// This is just a different version of the above code, maybe see how it feels.
+type FStoreClientB struct {
+	base *frugal.FBaseClient
+}
+
+func NewFStoreClientB(provider *frugal.FServiceProvider, middleware ...frugal.ServiceMiddleware) *FStoreClientB {
+	return &FStoreClientB{
+		base: frugal.NewFBaseClient(provider, middleware...),
+	}
+}
+
+func (f *FStoreClientB) BuyAlbum(ctx frugal.FContext, asin string, acct string) (r *Album, err error) {
+	args := StoreBuyAlbumArgs{
+		ASIN: asin,
+		Acct: acct,
+	}
+	res := StoreBuyAlbumResult{}
+	if err := f.base.Invoke(f, f.BuyAlbum, "buyAlbum", thrift.CALL, ctx, &args, &res); err != nil {
+		return StoreBuyAlbumResult_Success_DEFAULT, err
+	}
+	if res.IsSetError() {
+		return StoreBuyAlbumResult_Success_DEFAULT, res.GetError()
+	}
+	return res.GetSuccess(), nil
+}
+
+// Deprecated: use something else
+func (f *FStoreClientB) EnterAlbumGiveaway(ctx frugal.FContext, email string, name string) (r bool, err error) {
+	logrus.Warn("Call to deprecated function 'Store.EnterAlbumGiveaway'")
+	args := StoreEnterAlbumGiveawayArgs{
+		Email: email,
+		Name:  name,
+	}
+	res := StoreEnterAlbumGiveawayResult{}
+	if err := f.base.Invoke(f, f.EnterAlbumGiveaway, "enterAlbumGiveaway", thrift.CALL, ctx, &args, &res); err != nil {
+		return StoreEnterAlbumGiveawayResult_Success_DEFAULT, err
+	}
+	return res.GetSuccess(), nil
+}
+
 type FStoreProcessor struct {
 	*frugal.FBaseProcessor
 }
