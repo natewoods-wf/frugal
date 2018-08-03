@@ -38,8 +38,8 @@ func NewFStoreClient(provider *frugal.FServiceProvider, middleware ...frugal.Ser
 	proto := provider.GetProtocolFactory()
 	middleware = append(middleware, provider.GetMiddleware()...)
 	client := &FStoreClient{}
-	client.buyAlbum = frugal.NewInvoker(client, client.buyAlbum, "buyAlbum", trans, proto, thrift.CALL, middleware...)
-	client.enterAlbumGiveaway = frugal.NewInvoker(client, client.enterAlbumGiveaway, "enterAlbumGiveaway", trans, proto, thrift.CALL, middleware...)
+	client.buyAlbum = frugal.NewInvoker(client, client.buyAlbum, "buyAlbum", trans, proto, thrift.CALL, middleware)
+	client.enterAlbumGiveaway = frugal.NewInvoker(client, client.enterAlbumGiveaway, "enterAlbumGiveaway", trans, proto, thrift.CALL, middleware)
 	return client
 }
 

@@ -8,7 +8,7 @@ import (
 
 type Invoker func(ctx FContext, arguments, result thrift.TStruct) error
 
-func NewInvoker(proxiedHandler, method interface{}, name string, trans FTransport, pf *FProtocolFactory, typeID thrift.TMessageType, middlewares ...ServiceMiddleware) Invoker {
+func NewInvoker(proxiedHandler, method interface{}, name string, trans FTransport, pf *FProtocolFactory, typeID thrift.TMessageType, middlewares []ServiceMiddleware) Invoker {
 	core := func(ctx FContext, args, result thrift.TStruct) error {
 		buffer := NewTMemoryOutputBuffer(trans.GetRequestSizeLimit())
 		oprot := pf.GetProtocol(buffer)

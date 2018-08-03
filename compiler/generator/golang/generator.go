@@ -1620,7 +1620,7 @@ func (g *Generator) generateClient(service *parser.Service) string {
 		if method.Oneway {
 			msgType = "ONEWAY"
 		}
-		contents += fmt.Sprintf("\tclient.%s = frugal.NewInvoker(client, client.%s, \"%s\", trans, proto, thrift.%s, middleware...)\n", name, name, name, msgType)
+		contents += fmt.Sprintf("\tclient.%s = frugal.NewInvoker(client, client.%s, \"%s\", trans, proto, thrift.%s, middleware)\n", name, name, name, msgType)
 	}
 	contents += "\treturn client\n"
 	contents += "}\n\n"
