@@ -8,14 +8,14 @@ import (
 
 type Invoker func(ctx FContext, arguments, result thrift.TStruct) error
 
-func NewInvoker(proxiedHandler, method interface{}, name string, trans FTransport, pf *FProtocolFactory, middlewares ...ServiceMiddleware) Invoker {
+func NewInvoker(proxiedHandler, method interface{}, name string, trans FTransport, pf *FProtocolFactory, typeID thrift.TMessageType, middlewares ...ServiceMiddleware) Invoker {
 	core := func(ctx FContext, args, result thrift.TStruct) error {
 		buffer := NewTMemoryOutputBuffer(trans.GetRequestSizeLimit())
 		oprot := pf.GetProtocol(buffer)
 		if err := oprot.WriteRequestHeader(ctx); err != nil {
 			return err
 		}
-		if err := oprot.WriteMessageBegin(name, thrift.CALL, 0); err != nil {
+		if err := oprot.WriteMessageBegin(name, typeID, 0); err != nil {
 			return err
 		}
 		if err := args.Write(oprot); err != nil {
@@ -26,6 +26,9 @@ func NewInvoker(proxiedHandler, method interface{}, name string, trans FTranspor
 		}
 		if err := oprot.Flush(); err != nil {
 			return err
+		}
+		if typeID == thrift.ONEWAY {
+			return trans.Oneway(ctx, buffer.Bytes())
 		}
 		resultTransport, err := trans.Request(ctx, buffer.Bytes())
 		if err != nil {

@@ -37,10 +37,10 @@ func NewFStoreClient(provider *frugal.FServiceProvider, middleware ...frugal.Ser
 	trans := provider.GetTransport()
 	proto := provider.GetProtocolFactory()
 	middleware = append(middleware, provider.GetMiddleware()...)
-	c := &FStoreClient{}
-	c.buyAlbum = frugal.NewInvoker(c, c.BuyAlbum, "buyAlbum", trans, proto, middleware...)
-	c.enterAlbumGiveaway = frugal.NewInvoker(c, c.EnterAlbumGiveaway, "enterAlbumGiveaway", trans, proto, middleware...)
-	return c
+	client := &FStoreClient{}
+	client.buyAlbum = frugal.NewInvoker(client, client.buyAlbum, "buyAlbum", trans, proto, thrift.CALL, middleware...)
+	client.enterAlbumGiveaway = frugal.NewInvoker(client, client.enterAlbumGiveaway, "enterAlbumGiveaway", trans, proto, thrift.CALL, middleware...)
+	return client
 }
 
 func (f *FStoreClient) BuyAlbum(ctx frugal.FContext, asin string, acct string) (r *Album, err error) {
@@ -69,7 +69,7 @@ func (f *FStoreClient) EnterAlbumGiveaway(ctx frugal.FContext, email string, nam
 	if err := f.enterAlbumGiveaway(ctx, &args, &res); err != nil {
 		return StoreEnterAlbumGiveawayResult_Success_DEFAULT, err
 	}
-	return res.GetSuccess(), nil // TODO: error?
+	return res.GetSuccess(), nil
 }
 
 type FStoreProcessor struct {
