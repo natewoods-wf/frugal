@@ -602,7 +602,7 @@ func (g *Generator) generateRead(s *parser.Struct, sName string) string {
 
 	// For loop for reading fields
 	contents += "\tvar err error\n"
-	contents += "\tfor err != nil {\n"
+	contents += "\tfor err == nil {\n"
 	contents += "\t\t_, fieldTypeID, fieldID, rerr := iprot.ReadFieldBegin()\n"
 	contents += "\t\tif rerr != nil {\n"
 	contents += "\t\t\treturn thrift.PrependError(fmt.Sprintf(\"%T field %d read error: \", p, fieldID), rerr)\n"
@@ -614,7 +614,7 @@ func (g *Generator) generateRead(s *parser.Struct, sName string) string {
 		contents += "\t\tswitch fieldID {\n"
 		for _, field := range s.Fields {
 			contents += fmt.Sprintf("\t\tcase %d:\n", field.ID)
-			contents += fmt.Sprintf("\t\t\terr = p.ReadField%d(iprot)\n", field.ID)
+			contents += g.generateReadFieldShort("\t\t\t", field)
 			if field.Modifier == parser.Required {
 				contents += fmt.Sprintf("\t\t\tisset%s = true\n", snakeToCamel(field.Name))
 			}
@@ -710,7 +710,17 @@ func (g *Generator) generateToString(s *parser.Struct, sName string) string {
 	return contents
 }
 
+func (g *Generator) generateReadFieldShort(prefix string, field *parser.Field) string {
+	if field.Type.Name == "string" {
+		return fmt.Sprintf(prefix+"err = frugal.ReadString(iprot, &p.%s, \"field %d\")\n", snakeToCamel(field.Name), field.ID)
+	}
+	return fmt.Sprintf(prefix+"err = p.ReadField%d(iprot)\n", field.ID)
+}
+
 func (g *Generator) generateReadField(structName string, field *parser.Field) string {
+	if field.Type.Name == "string" {
+		return ""
+	}
 	contents := fmt.Sprintf("func (p *%s) ReadField%d(iprot thrift.TProtocol) error {\n", structName, field.ID)
 
 	contents += g.generateReadFieldRec(field, true)
@@ -1030,6 +1040,12 @@ func (g *Generator) GenerateTypesImports(file *os.File) error {
 		contents += "\t\"git.apache.org/thrift.git/lib/go/thrift\"\n"
 	}
 
+	if g.Options[frugalImportOption] != "" {
+		contents += "\t\"" + g.Options[frugalImportOption] + "\"\n"
+	} else {
+		contents += "\tfrugal \"github.com/Workiva/frugal/lib/go\""
+	}
+
 	protections := ""
 	pkgPrefix := g.Options[packagePrefixOption]
 	for _, include := range g.Frugal.Includes {
@@ -1105,7 +1121,7 @@ func (g *Generator) GenerateServiceImports(file *os.File, s *parser.Service) err
 	if g.Options[frugalImportOption] != "" {
 		imports += "\t\"" + g.Options[frugalImportOption] + "\"\n"
 	} else {
-		imports += "\t\"github.com/Workiva/frugal/lib/go\"\n"
+		imports += "\tfrugal \"github.com/Workiva/frugal/lib/go\"\n"
 	}
 	imports += "\t\"github.com/Sirupsen/logrus\"\n"
 

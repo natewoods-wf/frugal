@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"git.apache.org/thrift.git/lib/go/thrift"
+	frugal "github.com/Workiva/frugal/lib/go"
 )
 
 // (needed to ensure safety because of naive import list construction.)
@@ -132,7 +133,7 @@ func (p *Track) Read(iprot thrift.TProtocol) error {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
 	var err error
-	for err != nil {
+	for err == nil {
 		_, fieldTypeID, fieldID, rerr := iprot.ReadFieldBegin()
 		if rerr != nil {
 			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldID), rerr)
@@ -142,13 +143,13 @@ func (p *Track) Read(iprot thrift.TProtocol) error {
 		}
 		switch fieldID {
 		case 1:
-			err = p.ReadField1(iprot)
+			err = frugal.ReadString(iprot, &p.Title, "field 1")
 		case 2:
-			err = p.ReadField2(iprot)
+			err = frugal.ReadString(iprot, &p.Artist, "field 2")
 		case 3:
-			err = p.ReadField3(iprot)
+			err = frugal.ReadString(iprot, &p.Publisher, "field 3")
 		case 4:
-			err = p.ReadField4(iprot)
+			err = frugal.ReadString(iprot, &p.Composer, "field 4")
 		case 5:
 			err = p.ReadField5(iprot)
 		case 6:
@@ -165,42 +166,6 @@ func (p *Track) Read(iprot thrift.TProtocol) error {
 	}
 	if err := iprot.ReadStructEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
-	}
-	return nil
-}
-
-func (p *Track) ReadField1(iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadString(); err != nil {
-		return thrift.PrependError("error reading field 1: ", err)
-	} else {
-		p.Title = v
-	}
-	return nil
-}
-
-func (p *Track) ReadField2(iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadString(); err != nil {
-		return thrift.PrependError("error reading field 2: ", err)
-	} else {
-		p.Artist = v
-	}
-	return nil
-}
-
-func (p *Track) ReadField3(iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadString(); err != nil {
-		return thrift.PrependError("error reading field 3: ", err)
-	} else {
-		p.Publisher = v
-	}
-	return nil
-}
-
-func (p *Track) ReadField4(iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadString(); err != nil {
-		return thrift.PrependError("error reading field 4: ", err)
-	} else {
-		p.Composer = v
 	}
 	return nil
 }
@@ -370,7 +335,7 @@ func (p *Album) Read(iprot thrift.TProtocol) error {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
 	var err error
-	for err != nil {
+	for err == nil {
 		_, fieldTypeID, fieldID, rerr := iprot.ReadFieldBegin()
 		if rerr != nil {
 			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldID), rerr)
@@ -384,7 +349,7 @@ func (p *Album) Read(iprot thrift.TProtocol) error {
 		case 2:
 			err = p.ReadField2(iprot)
 		case 3:
-			err = p.ReadField3(iprot)
+			err = frugal.ReadString(iprot, &p.ASIN, "field 3")
 		default:
 			err = iprot.Skip(fieldTypeID)
 		}
@@ -426,15 +391,6 @@ func (p *Album) ReadField2(iprot thrift.TProtocol) error {
 	} else {
 		temp := Minutes(v)
 		p.Duration = temp
-	}
-	return nil
-}
-
-func (p *Album) ReadField3(iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadString(); err != nil {
-		return thrift.PrependError("error reading field 3: ", err)
-	} else {
-		p.ASIN = v
 	}
 	return nil
 }
@@ -539,7 +495,7 @@ func (p *PurchasingError) Read(iprot thrift.TProtocol) error {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
 	var err error
-	for err != nil {
+	for err == nil {
 		_, fieldTypeID, fieldID, rerr := iprot.ReadFieldBegin()
 		if rerr != nil {
 			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldID), rerr)
@@ -549,7 +505,7 @@ func (p *PurchasingError) Read(iprot thrift.TProtocol) error {
 		}
 		switch fieldID {
 		case 1:
-			err = p.ReadField1(iprot)
+			err = frugal.ReadString(iprot, &p.Message, "field 1")
 		case 2:
 			err = p.ReadField2(iprot)
 		default:
@@ -564,15 +520,6 @@ func (p *PurchasingError) Read(iprot thrift.TProtocol) error {
 	}
 	if err := iprot.ReadStructEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
-	}
-	return nil
-}
-
-func (p *PurchasingError) ReadField1(iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadString(); err != nil {
-		return thrift.PrependError("error reading field 1: ", err)
-	} else {
-		p.Message = v
 	}
 	return nil
 }
