@@ -29,64 +29,16 @@ type FStore interface {
 // Services are the API for client and server interaction.
 // Users can buy an album or enter a giveaway for a free album.
 type FStoreClient struct {
-	buyAlbum           frugal.Invoker
-	enterAlbumGiveaway frugal.Invoker
-}
-
-func NewFStoreClient(provider *frugal.FServiceProvider, middleware ...frugal.ServiceMiddleware) *FStoreClient {
-	trans := provider.GetTransport()
-	proto := provider.GetProtocolFactory()
-	middleware = append(middleware, provider.GetMiddleware()...)
-	client := &FStoreClient{}
-	client.buyAlbum = frugal.NewInvoker(client, client.buyAlbum, "buyAlbum", trans, proto, thrift.CALL, middleware)
-	client.enterAlbumGiveaway = frugal.NewInvoker(client, client.enterAlbumGiveaway, "enterAlbumGiveaway", trans, proto, thrift.CALL, middleware)
-	return client
-}
-
-func (f *FStoreClient) BuyAlbum(ctx frugal.FContext, asin string, acct string) (r *Album, err error) {
-	args := StoreBuyAlbumArgs{
-		ASIN: asin,
-		Acct: acct,
-	}
-	res := StoreBuyAlbumResult{}
-	if err := f.buyAlbum(ctx, &args, &res); err != nil {
-		return StoreBuyAlbumResult_Success_DEFAULT, err
-	}
-	if res.IsSetError() {
-		return StoreBuyAlbumResult_Success_DEFAULT, res.GetError()
-	}
-	return res.GetSuccess(), nil
-}
-
-// Deprecated: use something else
-func (f *FStoreClient) EnterAlbumGiveaway(ctx frugal.FContext, email string, name string) (r bool, err error) {
-	logrus.Warn("Call to deprecated function 'Store.EnterAlbumGiveaway'")
-	args := StoreEnterAlbumGiveawayArgs{
-		Email: email,
-		Name:  name,
-	}
-	res := StoreEnterAlbumGiveawayResult{}
-	if err := f.enterAlbumGiveaway(ctx, &args, &res); err != nil {
-		return StoreEnterAlbumGiveawayResult_Success_DEFAULT, err
-	}
-	return res.GetSuccess(), nil
-}
-
-// Services are the API for client and server interaction.
-// Users can buy an album or enter a giveaway for a free album.
-//
-// This is just a different version of the above code, maybe see how it feels.
-type FStoreClientB struct {
 	base *frugal.FBaseClient
 }
 
-func NewFStoreClientB(provider *frugal.FServiceProvider, middleware ...frugal.ServiceMiddleware) *FStoreClientB {
-	client := &FStoreClientB{}
+func NewFStoreClient(provider *frugal.FServiceProvider, middleware ...frugal.ServiceMiddleware) *FStoreClient {
+	client := &FStoreClient{}
 	client.base = frugal.NewFBaseClient(client, provider, middleware...)
 	return client
 }
 
-func (f *FStoreClientB) BuyAlbum(ctx frugal.FContext, asin string, acct string) (r *Album, err error) {
+func (f *FStoreClient) BuyAlbum(ctx frugal.FContext, asin string, acct string) (r *Album, err error) {
 	args := StoreBuyAlbumArgs{
 		ASIN: asin,
 		Acct: acct,
@@ -102,7 +54,7 @@ func (f *FStoreClientB) BuyAlbum(ctx frugal.FContext, asin string, acct string) 
 }
 
 // Deprecated: use something else
-func (f *FStoreClientB) EnterAlbumGiveaway(ctx frugal.FContext, email string, name string) (r bool, err error) {
+func (f *FStoreClient) EnterAlbumGiveaway(ctx frugal.FContext, email string, name string) (r bool, err error) {
 	logrus.Warn("Call to deprecated function 'Store.EnterAlbumGiveaway'")
 	args := StoreEnterAlbumGiveawayArgs{
 		Email: email,

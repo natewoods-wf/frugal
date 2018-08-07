@@ -1594,19 +1594,13 @@ func (g *Generator) generateClient(service *parser.Service) string {
 	if service.Extends != "" {
 		contents += fmt.Sprintf("\t*%sClient\n", g.getServiceExtendsName(service))
 	}
-	for _, method := range service.Methods {
-		name := parser.LowercaseFirstLetter(method.Name)
-		contents += fmt.Sprintf("\t%s frugal.Invoker\n", name)
-	}
+	contents += "\tbase *frugal.FBaseClient\n"
 	contents += "}\n\n"
 
 	// Client Constructor
 	contents += fmt.Sprintf(
 		"func NewF%sClient(provider *frugal.FServiceProvider, middleware ...frugal.ServiceMiddleware) *F%sClient {\n",
 		servTitle, servTitle)
-	contents += "\ttrans := provider.GetTransport()\n"
-	contents += "\tproto := provider.GetProtocolFactory()\n"
-	contents += "\tmiddleware = append(middleware, provider.GetMiddleware()...)\n"
 	contents += fmt.Sprintf("\tclient := &F%sClient{", servTitle)
 	if service.Extends != "" {
 		contents += fmt.Sprintf("\n\t\tF%sClient: %sNewF%sClient(provider, middleware...),\n\t}\n",
@@ -1614,14 +1608,7 @@ func (g *Generator) generateClient(service *parser.Service) string {
 	} else {
 		contents += "}\n"
 	}
-	for _, method := range service.Methods {
-		name := parser.LowercaseFirstLetter(method.Name)
-		msgType := "CALL"
-		if method.Oneway {
-			msgType = "ONEWAY"
-		}
-		contents += fmt.Sprintf("\tclient.%s = frugal.NewInvoker(client, client.%s, \"%s\", trans, proto, thrift.%s, middleware)\n", name, name, name, msgType)
-	}
+	contents += "\tclient.base = frugal.NewFBaseClient(client, provider, middleware...)\n"
 	contents += "\treturn client\n"
 	contents += "}\n\n"
 
@@ -1705,7 +1692,11 @@ func (g *Generator) generateClientMethod(service *parser.Service, method *parser
 	contents += fmt.Sprintf("\tres := %s%sResult{}\n", servTitle, nameTitle)
 
 	// Invoke the Invocation
-	contents += fmt.Sprintf("\tif err := f.%s(ctx, &args, &res); err != nil {\n", nameLower)
+	msgType := "CALL"
+	if method.Oneway {
+		msgType = "ONEWAY"
+	}
+	contents += fmt.Sprintf("\tif err := f.base.Invoke(f.%s, \"%s\", thrift.%s, ctx, &args, &res); err != nil {\n", nameTitle, nameLower, msgType)
 	if method.ReturnType == nil {
 		contents += "\t\treturn err\n"
 	} else {
