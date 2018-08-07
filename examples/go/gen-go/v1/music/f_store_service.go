@@ -286,32 +286,29 @@ func (p *StoreBuyAlbumArgs) Read(iprot thrift.TProtocol) error {
 	if _, err := iprot.ReadStructBegin(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
-
-	for {
-		_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin()
-		if err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+	var err error
+	for err != nil {
+		_, fieldTypeID, fieldID, rerr := iprot.ReadFieldBegin()
+		if rerr != nil {
+			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldID), rerr)
 		}
-		if fieldTypeId == thrift.STOP {
+		if fieldTypeID == thrift.STOP {
 			break
 		}
-		switch fieldId {
+		switch fieldID {
 		case 1:
-			if err := p.ReadField1(iprot); err != nil {
-				return err
-			}
+			err = p.ReadField1(iprot)
 		case 2:
-			if err := p.ReadField2(iprot); err != nil {
-				return err
-			}
+			err = p.ReadField2(iprot)
 		default:
-			if err := iprot.Skip(fieldTypeId); err != nil {
-				return err
-			}
+			err = iprot.Skip(fieldTypeID)
 		}
-		if err := iprot.ReadFieldEnd(); err != nil {
-			return err
+		if err == nil {
+			err = iprot.ReadFieldEnd()
 		}
+	}
+	if err != nil {
+		return err
 	}
 	if err := iprot.ReadStructEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
@@ -428,32 +425,29 @@ func (p *StoreBuyAlbumResult) Read(iprot thrift.TProtocol) error {
 	if _, err := iprot.ReadStructBegin(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
-
-	for {
-		_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin()
-		if err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+	var err error
+	for err != nil {
+		_, fieldTypeID, fieldID, rerr := iprot.ReadFieldBegin()
+		if rerr != nil {
+			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldID), rerr)
 		}
-		if fieldTypeId == thrift.STOP {
+		if fieldTypeID == thrift.STOP {
 			break
 		}
-		switch fieldId {
+		switch fieldID {
 		case 0:
-			if err := p.ReadField0(iprot); err != nil {
-				return err
-			}
+			err = p.ReadField0(iprot)
 		case 1:
-			if err := p.ReadField1(iprot); err != nil {
-				return err
-			}
+			err = p.ReadField1(iprot)
 		default:
-			if err := iprot.Skip(fieldTypeId); err != nil {
-				return err
-			}
+			err = iprot.Skip(fieldTypeID)
 		}
-		if err := iprot.ReadFieldEnd(); err != nil {
-			return err
+		if err == nil {
+			err = iprot.ReadFieldEnd()
 		}
+	}
+	if err != nil {
+		return err
 	}
 	if err := iprot.ReadStructEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
@@ -554,32 +548,29 @@ func (p *StoreEnterAlbumGiveawayArgs) Read(iprot thrift.TProtocol) error {
 	if _, err := iprot.ReadStructBegin(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
-
-	for {
-		_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin()
-		if err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+	var err error
+	for err != nil {
+		_, fieldTypeID, fieldID, rerr := iprot.ReadFieldBegin()
+		if rerr != nil {
+			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldID), rerr)
 		}
-		if fieldTypeId == thrift.STOP {
+		if fieldTypeID == thrift.STOP {
 			break
 		}
-		switch fieldId {
+		switch fieldID {
 		case 1:
-			if err := p.ReadField1(iprot); err != nil {
-				return err
-			}
+			err = p.ReadField1(iprot)
 		case 2:
-			if err := p.ReadField2(iprot); err != nil {
-				return err
-			}
+			err = p.ReadField2(iprot)
 		default:
-			if err := iprot.Skip(fieldTypeId); err != nil {
-				return err
-			}
+			err = iprot.Skip(fieldTypeID)
 		}
-		if err := iprot.ReadFieldEnd(); err != nil {
-			return err
+		if err == nil {
+			err = iprot.ReadFieldEnd()
 		}
+	}
+	if err != nil {
+		return err
 	}
 	if err := iprot.ReadStructEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
@@ -682,28 +673,27 @@ func (p *StoreEnterAlbumGiveawayResult) Read(iprot thrift.TProtocol) error {
 	if _, err := iprot.ReadStructBegin(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
-
-	for {
-		_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin()
-		if err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+	var err error
+	for err != nil {
+		_, fieldTypeID, fieldID, rerr := iprot.ReadFieldBegin()
+		if rerr != nil {
+			return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldID), rerr)
 		}
-		if fieldTypeId == thrift.STOP {
+		if fieldTypeID == thrift.STOP {
 			break
 		}
-		switch fieldId {
+		switch fieldID {
 		case 0:
-			if err := p.ReadField0(iprot); err != nil {
-				return err
-			}
+			err = p.ReadField0(iprot)
 		default:
-			if err := iprot.Skip(fieldTypeId); err != nil {
-				return err
-			}
+			err = iprot.Skip(fieldTypeID)
 		}
-		if err := iprot.ReadFieldEnd(); err != nil {
-			return err
+		if err == nil {
+			err = iprot.ReadFieldEnd()
 		}
+	}
+	if err != nil {
+		return err
 	}
 	if err := iprot.ReadStructEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)

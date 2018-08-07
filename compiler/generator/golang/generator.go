@@ -592,45 +592,44 @@ func (g *Generator) generateRead(s *parser.Struct, sName string) string {
 	contents += fmt.Sprintf("func (p *%s) Read(iprot thrift.TProtocol) error {\n", sName)
 	contents += "\tif _, err := iprot.ReadStructBegin(); err != nil {\n"
 	contents += "\t\treturn thrift.PrependError(fmt.Sprintf(\"%T read error: \", p), err)\n"
-	contents += "\t}\n\n"
+	contents += "\t}\n"
 	for _, field := range s.Fields {
 		// Generate variables to make sure required fields are present
 		if field.Modifier == parser.Required {
 			contents += fmt.Sprintf("\tisset%s := false\n", snakeToCamel(field.Name))
 		}
 	}
-	contents += "\n"
-	contents += "\tfor {\n"
-	contents += "\t\t_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin()\n"
-	contents += "\t\tif err != nil {\n"
-	contents += "\t\t\treturn thrift.PrependError(fmt.Sprintf(\"%T field %d read error: \", p, fieldId), err)\n"
+
+	// For loop for reading fields
+	contents += "\tvar err error\n"
+	contents += "\tfor err != nil {\n"
+	contents += "\t\t_, fieldTypeID, fieldID, rerr := iprot.ReadFieldBegin()\n"
+	contents += "\t\tif rerr != nil {\n"
+	contents += "\t\t\treturn thrift.PrependError(fmt.Sprintf(\"%T field %d read error: \", p, fieldID), rerr)\n"
 	contents += "\t\t}\n"
-	contents += "\t\tif fieldTypeId == thrift.STOP {\n"
+	contents += "\t\tif fieldTypeID == thrift.STOP {\n"
 	contents += "\t\t\tbreak\n"
 	contents += "\t\t}\n"
 	if len(s.Fields) > 0 {
-		contents += "\t\tswitch fieldId {\n"
+		contents += "\t\tswitch fieldID {\n"
 		for _, field := range s.Fields {
 			contents += fmt.Sprintf("\t\tcase %d:\n", field.ID)
-			contents += fmt.Sprintf("\t\t\tif err := p.ReadField%d(iprot); err != nil {\n", field.ID)
-			contents += "\t\t\t\treturn err\n"
-			contents += "\t\t\t}\n"
+			contents += fmt.Sprintf("\t\t\terr = p.ReadField%d(iprot)\n", field.ID)
 			if field.Modifier == parser.Required {
 				contents += fmt.Sprintf("\t\t\tisset%s = true\n", snakeToCamel(field.Name))
 			}
 		}
 		contents += "\t\tdefault:\n"
 	}
-	contents += "\t\t\tif err := iprot.Skip(fieldTypeId); err != nil {\n"
-	contents += "\t\t\t\treturn err\n"
-	contents += "\t\t\t}\n"
+	contents += "\t\t\terr = iprot.Skip(fieldTypeID)\n"
 	if len(s.Fields) > 0 {
 		contents += "\t\t}\n"
 	}
-	contents += "\t\tif err := iprot.ReadFieldEnd(); err != nil {\n"
-	contents += "\t\t\treturn err\n"
+	contents += "\t\tif err == nil {\n"
+	contents += "\t\t\terr = iprot.ReadFieldEnd()\n"
 	contents += "\t\t}\n"
 	contents += "\t}\n"
+	contents += "\tif err != nil {\n\t\treturn err\n\t}\n"
 	contents += "\tif err := iprot.ReadStructEnd(); err != nil {\n"
 	contents += "\t\treturn thrift.PrependError(fmt.Sprintf(\"%T read struct end error: \", p), err)\n"
 	contents += "\t}\n"
