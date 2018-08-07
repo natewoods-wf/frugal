@@ -161,7 +161,12 @@ func (g *Generator) GenerateScopePackage(file *os.File, s *parser.Scope) error {
 }
 
 func (g *Generator) generatePackage(file *os.File) error {
-	pkg := ""
+	pkg := g.packageName()
+	_, err := file.WriteString(fmt.Sprintf("package %s", pkg))
+	return err
+}
+
+func (g *Generator) packageName() (pkg string) {
 	namespace := g.Frugal.Namespace(lang)
 	if namespace != nil {
 		components := generator.GetPackageComponents(namespace.Value)
@@ -169,8 +174,7 @@ func (g *Generator) generatePackage(file *os.File) error {
 	} else {
 		pkg = g.Frugal.Name
 	}
-	_, err := file.WriteString(fmt.Sprintf("package %s", pkg))
-	return err
+	return pkg
 }
 
 // GenerateConstantsContents generates constants.
@@ -677,9 +681,7 @@ func (g *Generator) generateWrite(s *parser.Struct, sName string) string {
 	contents += "\t}\n"
 
 	for _, field := range s.Fields {
-		contents += fmt.Sprintf("\tif err := p.writeField%d(oprot); err != nil {\n", field.ID)
-		contents += "\t\treturn err\n"
-		contents += "\t}\n"
+		contents += g.generateWriteFieldShort(fmt.Sprintf("*%s.%s", g.packageName(), sName), field)
 	}
 
 	contents += "\tif err := oprot.WriteFieldStop(); err != nil{\n"
@@ -904,7 +906,23 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string
 	return contents
 }
 
+func (g *Generator) generateWriteFieldShort(typeName string, field *parser.Field) string {
+	var contents string
+	if field.Type.Name == "string" {
+		contents += fmt.Sprintf("\tif err := frugal.WriteString(oprot, p.%s, \"%s\", %d); err != nil {\n", snakeToCamel(field.Name), field.Name, field.ID)
+		contents += fmt.Sprintf("\t\treturn thrift.PrependError(\"%s::%s:%d \", err)", typeName, field.Name, field.ID)
+	} else {
+		contents += fmt.Sprintf("\tif err := p.writeField%d(oprot); err != nil {\n", field.ID)
+		contents += "\t\treturn err\n"
+	}
+	contents += "\t}\n"
+	return contents
+}
+
 func (g *Generator) generateWriteField(structName string, field *parser.Field) string {
+	if field.Type.Name == "string" {
+		return ""
+	}
 	contents := ""
 	fName := snakeToCamel(field.Name)
 
