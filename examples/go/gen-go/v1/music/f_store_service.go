@@ -67,6 +67,74 @@ func (f *FStoreClient) EnterAlbumGiveaway(ctx frugal.FContext, email string, nam
 	return res.GetSuccess(), nil
 }
 
+// START STUFF THAT SHOULD BE IN FRUGAL REPO
+
+type ServiceDesc struct {
+	Name    string
+	Methods []MethodDesc
+}
+
+type methodHandler func(svc interface{}, ctx frugal.FContext, dec func(interface{}) error) (interface{}, error)
+
+type MethodDesc struct {
+	Name    string
+	Handler methodHandler
+}
+
+func NewFProcessor(descriptor *ServiceDesc, handler interface{}, middleware []frugal.ServiceMiddleware) frugal.FProcessor {
+	return nil // TODO: build this and move it into frugal code
+}
+
+// END STUFF THAT SHOULD BE IN FRUGAL REPO
+
+func fStoreBuyAlbumHandler(svc interface{}, ctx frugal.FContext, dec func(interface{}) error) (interface{}, error) {
+	args := &StoreBuyAlbumArgs{}
+	if err := dec(args); err != nil {
+		return nil, err
+	}
+	res := &StoreBuyAlbumResult{}
+	obj, err := svc.(FStore).BuyAlbum(ctx, args.ASIN, args.Acct)
+	switch v := err.(type) {
+	case nil:
+		res.Success = obj
+	case *PurchasingError:
+		res.Error = v
+		err = nil
+	default:
+		return nil, err
+	}
+	return res, err
+}
+
+func fStoreEnterAlbumGiveawayHandler(svc interface{}, ctx frugal.FContext, dec func(interface{}) error) (interface{}, error) {
+	logrus.Warn("Deprecated function 'Store.EnterAlbumGiveaway' was called by a client")
+	args := StoreEnterAlbumGiveawayArgs{}
+	if err := dec(args); err != nil {
+		return nil, err
+	}
+	res := StoreEnterAlbumGiveawayResult{}
+	obj, err := svc.(FStore).EnterAlbumGiveaway(ctx, args.Email, args.Name)
+	if err == nil {
+		*res.Success = obj
+	}
+	return res, err
+}
+
+var fStoreServiceDescriptor = ServiceDesc{
+	Name: "*music.Store",
+	Methods: []MethodDesc{{
+		Name:    "BuyAlbum",
+		Handler: fStoreBuyAlbumHandler,
+	}, {
+		Name:    "EnterAlbumGiveaway",
+		Handler: fStoreEnterAlbumGiveawayHandler,
+	}},
+}
+
+func NewFStoreProcessor2(handler FStore, middleware ...frugal.ServiceMiddleware) frugal.FProcessor {
+	return NewFProcessor(&fStoreServiceDescriptor, handler, middleware)
+}
+
 type FStoreProcessor struct {
 	*frugal.FBaseProcessor
 }
