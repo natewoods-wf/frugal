@@ -25,3 +25,38 @@ func WriteString(p thrift.TProtocol, str, name string, field int16) error {
 	}
 	return nil
 }
+
+// WriteObj writes `obj` to `p` based on its assigned type.
+func WriteObj(p thrift.TProtocol, name string, typ thrift.TType, field int16, obj interface{}) error {
+	err := p.WriteFieldBegin(name, typ, field)
+	if err != nil {
+		return thrift.PrependError("write field begin error: ", err)
+	}
+	switch typ {
+	case thrift.BOOL:
+		err = p.WriteBool(obj.(bool))
+	case thrift.BYTE:
+		err = p.WriteByte(obj.(int8))
+	case thrift.DOUBLE:
+		err = p.WriteDouble(obj.(float64))
+	case thrift.I16:
+		err = p.WriteI16(obj.(int16))
+	case thrift.I32:
+		err = p.WriteI32(obj.(int32))
+	case thrift.I64:
+		err = p.WriteI64(obj.(int64))
+	case thrift.STRING:
+		err = p.WriteString(obj.(string))
+	case thrift.BINARY:
+		err = p.WriteBinary(obj.([]byte))
+	default:
+		err = thrift.NewTTransportException(thrift.UNKNOWN_TRANSPORT_EXCEPTION, "unsupported field type")
+	}
+	if err != nil {
+		return thrift.PrependError("field write error: ", err)
+	}
+	if err = p.WriteFieldEnd(); err != nil {
+		return thrift.PrependError("write field end error: ", err)
+	}
+	return nil
+}
