@@ -14,6 +14,9 @@
 package frugal
 
 import (
+	"fmt"
+	"reflect"
+	"strings"
 	"sync"
 
 	"git.apache.org/thrift.git/lib/go/thrift"
@@ -192,4 +195,139 @@ func (f *FBaseProcessorFunction) AddMiddleware(middleware ServiceMiddleware) {
 // InvokeMethod invokes the handler method.
 func (f *FBaseProcessorFunction) InvokeMethod(args []interface{}) Results {
 	return f.handler.Invoke(args)
+}
+
+type ServiceDesc struct {
+	Name    string
+	Methods []MethodDesc
+}
+
+type methodHandler func(svc interface{}, ctx FContext, dec func(interface{}) error) (interface{}, error)
+
+type MethodDesc struct {
+	Name    string
+	Handler methodHandler
+	Annots  map[string]string
+
+	core *FBaseProcessorFunction
+}
+
+func first2lower(in string) string {
+	if len(in) == 0 {
+		return in
+	}
+	return strings.ToLower(in[0:0]) + in[1:]
+}
+
+func NewFProcessor(service *ServiceDesc, handler interface{}, middleware []ServiceMiddleware) FProcessor {
+	p := NewFBaseProcessor()
+	for _, m := range service.Methods {
+		name := first2lower(m.Name)
+		p.AddToProcessorMap(name, p.newProcessor(service, &m, handler, middleware))
+		if len(m.Annots) > 0 {
+			p.AddToAnnotationsMap(name, m.Annots)
+		}
+	}
+	return p
+}
+
+// newProcessor is inspired by NewMethod, but tweaked for the ServiceDesc and MethodDesc logic.
+func (f *FBaseProcessor) newProcessor(service *ServiceDesc, method *MethodDesc, handler interface{}, middleware []ServiceMiddleware) FProcessorFunction {
+	reflectHandler := reflect.ValueOf(handler)
+	m, ok := reflectHandler.Type().MethodByName(method.Name)
+	if !ok {
+		panic(fmt.Sprintf("frugal: no such method %s on type %s", method.Name, reflectHandler))
+	}
+	method.core = NewFBaseProcessorFunction(&f.writeMu, &Method{
+		handler:       composeMiddleware(reflect.ValueOf(method.Handler), middleware),
+		proxiedStruct: reflectHandler,
+		proxiedMethod: m,
+	})
+	return method
+}
+
+func (m *MethodDesc) AddMiddleware(ware ServiceMiddleware) { m.core.AddMiddleware(ware) }
+func (m *MethodDesc) Process(ctx FContext, iprot, oprot *FProtocol) error {
+	// args := StoreBuyAlbumArgs{}
+	var err error
+	// if err = args.Read(iprot); err != nil {
+	// 	iprot.ReadMessageEnd()
+	// 	p.GetWriteMutex().Lock()
+	// 	err = storeWriteApplicationError(ctx, oprot, APPLICATION_EXCEPTION_PROTOCOL_ERROR, "buyAlbum", err.Error())
+	// 	p.GetWriteMutex().Unlock()
+	// 	return err
+	// }
+	//
+	// iprot.ReadMessageEnd()
+	// result := StoreBuyAlbumResult{}
+	// var err2 error
+	// ret := p.InvokeMethod([]interface{}{ctx, args.ASIN, args.Acct})
+	// if len(ret) != 2 {
+	// 	panic(fmt.Sprintf("Middleware returned %d arguments, expected 2", len(ret)))
+	// }
+	// if ret[1] != nil {
+	// 	err2 = ret[1].(error)
+	// }
+	// if err2 != nil {
+	// 	if err3, ok := err2.(thrift.TApplicationException); ok {
+	// 		p.GetWriteMutex().Lock()
+	// 		oprot.WriteResponseHeader(ctx)
+	// 		oprot.WriteMessageBegin("buyAlbum", thrift.EXCEPTION, 0)
+	// 		err3.Write(oprot)
+	// 		oprot.WriteMessageEnd()
+	// 		oprot.Flush()
+	// 		p.GetWriteMutex().Unlock()
+	// 		return nil
+	// 	}
+	// 	switch v := err2.(type) {
+	// 	case *PurchasingError:
+	// 		result.Error = v
+	// 	default:
+	// 		p.GetWriteMutex().Lock()
+	// 		err2 := storeWriteApplicationError(ctx, oprot, frugal.APPLICATION_EXCEPTION_INTERNAL_ERROR, "buyAlbum", "Internal error processing buyAlbum: "+err2.Error())
+	// 		p.GetWriteMutex().Unlock()
+	// 		return err2
+	// 	}
+	// } else {
+	// 	var retval *Album = ret[0].(*Album)
+	// 	result.Success = retval
+	// }
+	// p.GetWriteMutex().Lock()
+	// defer p.GetWriteMutex().Unlock()
+	// if err2 = oprot.WriteResponseHeader(ctx); err2 != nil {
+	// 	if frugal.IsErrTooLarge(err2) {
+	// 		storeWriteApplicationError(ctx, oprot, frugal.APPLICATION_EXCEPTION_RESPONSE_TOO_LARGE, "buyAlbum", err2.Error())
+	// 		return nil
+	// 	}
+	// 	err = err2
+	// }
+	// if err2 = oprot.WriteMessageBegin("buyAlbum", thrift.REPLY, 0); err2 != nil {
+	// 	if frugal.IsErrTooLarge(err2) {
+	// 		storeWriteApplicationError(ctx, oprot, frugal.APPLICATION_EXCEPTION_RESPONSE_TOO_LARGE, "buyAlbum", err2.Error())
+	// 		return nil
+	// 	}
+	// 	err = err2
+	// }
+	// if err2 = result.Write(oprot); err == nil && err2 != nil {
+	// 	if frugal.IsErrTooLarge(err2) {
+	// 		storeWriteApplicationError(ctx, oprot, frugal.APPLICATION_EXCEPTION_RESPONSE_TOO_LARGE, "buyAlbum", err2.Error())
+	// 		return nil
+	// 	}
+	// 	err = err2
+	// }
+	// if err2 = oprot.WriteMessageEnd(); err == nil && err2 != nil {
+	// 	if frugal.IsErrTooLarge(err2) {
+	// 		storeWriteApplicationError(ctx, oprot, frugal.APPLICATION_EXCEPTION_RESPONSE_TOO_LARGE, "buyAlbum", err2.Error())
+	// 		return nil
+	// 	}
+	// 	err = err2
+	// }
+	// if err2 = oprot.Flush(); err == nil && err2 != nil {
+	// 	if frugal.IsErrTooLarge(err2) {
+	// 		storeWriteApplicationError(ctx, oprot, frugal.APPLICATION_EXCEPTION_RESPONSE_TOO_LARGE, "buyAlbum", err2.Error())
+	// 		return nil
+	// 	}
+	// 	err = err2
+	// }
+	return err
 }

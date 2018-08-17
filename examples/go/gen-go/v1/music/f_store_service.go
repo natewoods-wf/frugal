@@ -67,26 +67,6 @@ func (f *FStoreClient) EnterAlbumGiveaway(ctx frugal.FContext, email string, nam
 	return res.GetSuccess(), nil
 }
 
-// START STUFF THAT SHOULD BE IN FRUGAL REPO
-
-type ServiceDesc struct {
-	Name    string
-	Methods []MethodDesc
-}
-
-type methodHandler func(svc interface{}, ctx frugal.FContext, dec func(interface{}) error) (interface{}, error)
-
-type MethodDesc struct {
-	Name    string
-	Handler methodHandler
-}
-
-func NewFProcessor(descriptor *ServiceDesc, handler interface{}, middleware []frugal.ServiceMiddleware) frugal.FProcessor {
-	return nil // TODO: build this and move it into frugal code
-}
-
-// END STUFF THAT SHOULD BE IN FRUGAL REPO
-
 func fStoreBuyAlbumHandler(svc interface{}, ctx frugal.FContext, dec func(interface{}) error) (interface{}, error) {
 	args := &StoreBuyAlbumArgs{}
 	if err := dec(args); err != nil {
@@ -120,19 +100,23 @@ func fStoreEnterAlbumGiveawayHandler(svc interface{}, ctx frugal.FContext, dec f
 	return res, err
 }
 
-var fStoreServiceDescriptor = ServiceDesc{
+var fStoreServiceDescriptor = frugal.ServiceDesc{
 	Name: "*music.Store",
-	Methods: []MethodDesc{{
+	Methods: []frugal.MethodDesc{{
 		Name:    "BuyAlbum",
 		Handler: fStoreBuyAlbumHandler,
 	}, {
 		Name:    "EnterAlbumGiveaway",
 		Handler: fStoreEnterAlbumGiveawayHandler,
+		Annots: map[string]string{
+			"deprecated": "use something else",
+		},
 	}},
 }
 
+// NewFStoreProcessor2 is an example of the code the generator could write if we standardize some thing
 func NewFStoreProcessor2(handler FStore, middleware ...frugal.ServiceMiddleware) frugal.FProcessor {
-	return NewFProcessor(&fStoreServiceDescriptor, handler, middleware)
+	return frugal.NewFProcessor(&fStoreServiceDescriptor, handler, middleware)
 }
 
 type FStoreProcessor struct {
