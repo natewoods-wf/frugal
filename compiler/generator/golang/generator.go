@@ -714,6 +714,9 @@ func (g *Generator) generateToString(s *parser.Struct, sName string) string {
 
 func (g *Generator) generateReadFieldShort(prefix string, field *parser.Field) string {
 	if field.Type.Name == "string" {
+		if field.Modifier == parser.Optional {
+			return fmt.Sprintf(prefix+"err = frugal.ReadString(iprot, p.%s, \"field %d\")\n", snakeToCamel(field.Name), field.ID)
+		}
 		return fmt.Sprintf(prefix+"err = frugal.ReadString(iprot, &p.%s, \"field %d\")\n", snakeToCamel(field.Name), field.ID)
 	}
 	return fmt.Sprintf(prefix+"err = p.ReadField%d(iprot)\n", field.ID)
@@ -909,7 +912,11 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string
 func (g *Generator) generateWriteFieldShort(typeName string, field *parser.Field) string {
 	var contents string
 	if field.Type.Name == "string" {
-		contents += fmt.Sprintf("\tif err := frugal.WriteString(oprot, p.%s, \"%s\", %d); err != nil {\n", snakeToCamel(field.Name), field.Name, field.ID)
+		if field.Modifier == parser.Optional {
+			contents += fmt.Sprintf("\tif err := frugal.WriteString(oprot, *p.%s, \"%s\", %d); err != nil {\n", snakeToCamel(field.Name), field.Name, field.ID)
+		} else {
+			contents += fmt.Sprintf("\tif err := frugal.WriteString(oprot, p.%s, \"%s\", %d); err != nil {\n", snakeToCamel(field.Name), field.Name, field.ID)
+		}
 		contents += fmt.Sprintf("\t\treturn thrift.PrependError(\"%s::%s:%d \", err)", typeName, field.Name, field.ID)
 	} else {
 		contents += fmt.Sprintf("\tif err := p.writeField%d(oprot); err != nil {\n", field.ID)
@@ -1061,7 +1068,7 @@ func (g *Generator) GenerateTypesImports(file *os.File) error {
 	if g.Options[frugalImportOption] != "" {
 		contents += "\t\"" + g.Options[frugalImportOption] + "\"\n"
 	} else {
-		contents += "\tfrugal \"github.com/Workiva/frugal/lib/go\""
+		contents += "\tfrugal \"github.com/Workiva/frugal/lib/go\"\n"
 	}
 
 	protections := ""

@@ -47,8 +47,8 @@ func WriteObj(p thrift.TProtocol, name string, typ thrift.TType, field int16, ob
 		err = p.WriteI64(obj.(int64))
 	case thrift.STRING:
 		err = p.WriteString(obj.(string))
-	case thrift.BINARY:
-		err = p.WriteBinary(obj.([]byte))
+	// case thrift.BINARY:
+	// 	err = p.WriteBinary(obj.([]byte))
 	default:
 		err = thrift.NewTTransportException(thrift.UNKNOWN_TRANSPORT_EXCEPTION, "unsupported field type")
 	}
