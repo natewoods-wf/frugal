@@ -475,8 +475,8 @@ func (p *PurchasingError) Write(oprot thrift.TProtocol) error {
 	if err := frugal.WriteString(oprot, p.Message, "message", 1); err != nil {
 		return thrift.PrependError("*music.PurchasingError::message:1 ", err)
 	}
-	if err := p.writeField2(oprot); err != nil {
-		return err
+	if err := frugal.WriteI16(oprot, p.ErrorCode, "error_code", 2); err != nil {
+		return thrift.PrependError("*music.PurchasingError::error_code:2 ", err)
 	}
 	if err := oprot.WriteFieldStop(); err != nil {
 		return thrift.PrependError("write field stop error: ", err)

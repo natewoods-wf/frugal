@@ -911,12 +911,12 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string
 
 func (g *Generator) generateWriteFieldShort(typeName string, field *parser.Field) string {
 	var contents string
-	if field.Type.Name == "string" {
+	if field.Type.IsPrimitive() {
+		var ptr string
 		if field.Modifier == parser.Optional {
-			contents += fmt.Sprintf("\tif err := frugal.WriteString(oprot, *p.%s, \"%s\", %d); err != nil {\n", snakeToCamel(field.Name), field.Name, field.ID)
-		} else {
-			contents += fmt.Sprintf("\tif err := frugal.WriteString(oprot, p.%s, \"%s\", %d); err != nil {\n", snakeToCamel(field.Name), field.Name, field.ID)
+			ptr = "*"
 		}
+		contents += fmt.Sprintf("\tif err := frugal.Write%s(oprot, %sp.%s, \"%s\", %d); err != nil {\n", strings.Title(field.Type.Name), ptr, snakeToCamel(field.Name), field.Name, field.ID)
 		contents += fmt.Sprintf("\t\treturn thrift.PrependError(\"%s::%s:%d \", err)", typeName, field.Name, field.ID)
 	} else {
 		contents += fmt.Sprintf("\tif err := p.writeField%d(oprot); err != nil {\n", field.ID)
@@ -927,7 +927,7 @@ func (g *Generator) generateWriteFieldShort(typeName string, field *parser.Field
 }
 
 func (g *Generator) generateWriteField(structName string, field *parser.Field) string {
-	if field.Type.Name == "string" {
+	if field.Type.IsPrimitive() {
 		return ""
 	}
 	contents := ""

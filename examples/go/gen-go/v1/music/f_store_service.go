@@ -678,8 +678,8 @@ func (p *StoreEnterAlbumGiveawayResult) Write(oprot thrift.TProtocol) error {
 	if err := oprot.WriteStructBegin("enterAlbumGiveaway_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
-	if err := p.writeField0(oprot); err != nil {
-		return err
+	if err := frugal.WriteBool(oprot, *p.Success, "success", 0); err != nil {
+		return thrift.PrependError("*music.StoreEnterAlbumGiveawayResult::success:0 ", err)
 	}
 	if err := oprot.WriteFieldStop(); err != nil {
 		return thrift.PrependError("write field stop error: ", err)
