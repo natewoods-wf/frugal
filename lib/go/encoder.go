@@ -12,6 +12,76 @@ func ReadString(p thrift.TProtocol, obj *string, msg string) error {
 	return nil
 }
 
+// ReadBool reads a bool from p and assigns it to obj.
+func ReadBool(p thrift.TProtocol, obj *bool, msg string) error {
+	if v, err := p.ReadBool(); err != nil {
+		return thrift.PrependError("error reading "+msg+":", err)
+	} else {
+		*obj = v
+	}
+	return nil
+}
+
+// ReadByte reads a byte from p and assigns it to obj.
+func ReadByte(p thrift.TProtocol, obj *byte, msg string) error {
+	if v, err := p.ReadByte(); err != nil {
+		return thrift.PrependError("error reading "+msg+":", err)
+	} else {
+		*obj = byte(v)
+	}
+	return nil
+}
+
+// ReadDouble reads a float64 from p and assigns it to obj.
+func ReadDouble(p thrift.TProtocol, obj *float64, msg string) error {
+	if v, err := p.ReadDouble(); err != nil {
+		return thrift.PrependError("error reading "+msg+":", err)
+	} else {
+		*obj = v
+	}
+	return nil
+}
+
+// ReadI16 reads a int16 from p and assigns it to obj.
+func ReadI16(p thrift.TProtocol, obj *int16, msg string) error {
+	if v, err := p.ReadI16(); err != nil {
+		return thrift.PrependError("error reading "+msg+":", err)
+	} else {
+		*obj = v
+	}
+	return nil
+}
+
+// ReadI32 reads a int32 from p and assigns it to obj.
+func ReadI32(p thrift.TProtocol, obj *int32, msg string) error {
+	if v, err := p.ReadI32(); err != nil {
+		return thrift.PrependError("error reading "+msg+":", err)
+	} else {
+		*obj = v
+	}
+	return nil
+}
+
+// ReadI64 reads a int64 from p and assigns it to obj.
+func ReadI64(p thrift.TProtocol, obj *int64, msg string) error {
+	if v, err := p.ReadI64(); err != nil {
+		return thrift.PrependError("error reading "+msg+":", err)
+	} else {
+		*obj = v
+	}
+	return nil
+}
+
+// ReadBinary reads a []byte from p and assigns it to obj.
+func ReadBinary(p thrift.TProtocol, obj *[]byte, msg string) error {
+	if v, err := p.ReadBinary(); err != nil {
+		return thrift.PrependError("error reading "+msg+":", err)
+	} else {
+		*obj = v
+	}
+	return nil
+}
+
 // WriteString writes string `value` of field name and id `name` and `field` respectively into `p`.
 func WriteString(p thrift.TProtocol, value, name string, field int16) error {
 	if err := p.WriteFieldBegin(name, thrift.STRING, field); err != nil {

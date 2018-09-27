@@ -442,7 +442,7 @@ func (p *PurchasingError) Read(iprot thrift.TProtocol) error {
 		case 1:
 			err = frugal.ReadString(iprot, &p.Message, "field 1")
 		case 2:
-			err = p.ReadField2(iprot)
+			err = frugal.ReadI16(iprot, &p.ErrorCode, "field 2")
 		default:
 			err = iprot.Skip(fieldTypeID)
 		}
@@ -455,15 +455,6 @@ func (p *PurchasingError) Read(iprot thrift.TProtocol) error {
 	}
 	if err := iprot.ReadStructEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
-	}
-	return nil
-}
-
-func (p *PurchasingError) ReadField2(iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadI16(); err != nil {
-		return thrift.PrependError("error reading field 2: ", err)
-	} else {
-		p.ErrorCode = v
 	}
 	return nil
 }
@@ -483,19 +474,6 @@ func (p *PurchasingError) Write(oprot thrift.TProtocol) error {
 	}
 	if err := oprot.WriteStructEnd(); err != nil {
 		return thrift.PrependError("write struct stop error: ", err)
-	}
-	return nil
-}
-
-func (p *PurchasingError) writeField2(oprot thrift.TProtocol) error {
-	if err := oprot.WriteFieldBegin("error_code", thrift.I16, 2); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:error_code: ", p), err)
-	}
-	if err := oprot.WriteI16(int16(p.ErrorCode)); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T.error_code (2) field write error: ", p), err)
-	}
-	if err := oprot.WriteFieldEnd(); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field end error 2:error_code: ", p), err)
 	}
 	return nil
 }

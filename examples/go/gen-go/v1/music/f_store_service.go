@@ -648,7 +648,8 @@ func (p *StoreEnterAlbumGiveawayResult) Read(iprot thrift.TProtocol) error {
 		}
 		switch fieldID {
 		case 0:
-			err = p.ReadField0(iprot)
+			p.Success = new(bool)
+			err = frugal.ReadBool(iprot, p.Success, "field 0")
 		default:
 			err = iprot.Skip(fieldTypeID)
 		}
@@ -665,15 +666,6 @@ func (p *StoreEnterAlbumGiveawayResult) Read(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *StoreEnterAlbumGiveawayResult) ReadField0(iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadBool(); err != nil {
-		return thrift.PrependError("error reading field 0: ", err)
-	} else {
-		p.Success = &v
-	}
-	return nil
-}
-
 func (p *StoreEnterAlbumGiveawayResult) Write(oprot thrift.TProtocol) error {
 	if err := oprot.WriteStructBegin("enterAlbumGiveaway_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
@@ -686,21 +678,6 @@ func (p *StoreEnterAlbumGiveawayResult) Write(oprot thrift.TProtocol) error {
 	}
 	if err := oprot.WriteStructEnd(); err != nil {
 		return thrift.PrependError("write struct stop error: ", err)
-	}
-	return nil
-}
-
-func (p *StoreEnterAlbumGiveawayResult) writeField0(oprot thrift.TProtocol) error {
-	if p.IsSetSuccess() {
-		if err := oprot.WriteFieldBegin("success", thrift.BOOL, 0); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err)
-		}
-		if err := oprot.WriteBool(bool(*p.Success)); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T.success (0) field write error: ", p), err)
-		}
-		if err := oprot.WriteFieldEnd(); err != nil {
-			return thrift.PrependError(fmt.Sprintf("%T write field end error 0:success: ", p), err)
-		}
 	}
 	return nil
 }

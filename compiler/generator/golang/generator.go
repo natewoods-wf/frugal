@@ -713,17 +713,20 @@ func (g *Generator) generateToString(s *parser.Struct, sName string) string {
 }
 
 func (g *Generator) generateReadFieldShort(prefix string, field *parser.Field) string {
-	if field.Type.Name == "string" {
+	if field.Type.IsPrimitive() {
+		ptr := "&"
+		var head string
 		if field.Modifier == parser.Optional {
-			return fmt.Sprintf(prefix+"err = frugal.ReadString(iprot, p.%s, \"field %d\")\n", snakeToCamel(field.Name), field.ID)
+			ptr = ""
+			head = prefix + fmt.Sprintf("p.%s = new(%s)\n", snakeToCamel(field.Name), field.Type.Name)
 		}
-		return fmt.Sprintf(prefix+"err = frugal.ReadString(iprot, &p.%s, \"field %d\")\n", snakeToCamel(field.Name), field.ID)
+		return fmt.Sprintf(head+prefix+"err = frugal.Read%s(iprot, %sp.%s, \"field %d\")\n", strings.Title(field.Type.Name), ptr, snakeToCamel(field.Name), field.ID)
 	}
 	return fmt.Sprintf(prefix+"err = p.ReadField%d(iprot)\n", field.ID)
 }
 
 func (g *Generator) generateReadField(structName string, field *parser.Field) string {
-	if field.Type.Name == "string" {
+	if field.Type.IsPrimitive() {
 		return ""
 	}
 	contents := fmt.Sprintf("func (p *%s) ReadField%d(iprot thrift.TProtocol) error {\n", structName, field.ID)
