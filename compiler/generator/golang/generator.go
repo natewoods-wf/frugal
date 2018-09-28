@@ -912,25 +912,71 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string
 	return contents
 }
 
+func thrift2go(typ string, isEnum bool) string {
+	switch typ {
+	// Just typecast everything to get around typedefs
+	case "bool":
+		return "bool"
+	case "byte", "i8":
+		return "int8"
+	case "i16":
+		return "int16"
+	case "i32":
+		return "int32"
+	case "i64":
+		return "int64"
+	case "double":
+		return "float64"
+	case "string":
+		return "string"
+	case "binary":
+		return "[]byte"
+	default:
+		if isEnum {
+			return "int32"
+		}
+		panic("unknown thrift type: " + typ)
+	}
+}
+
 func (g *Generator) generateWriteFieldShort(typeName string, field *parser.Field) string {
 	var contents string
+
+	// base types
+	baseType := g.Frugal.UnderlyingType(field.Type)
+	isEnum := g.Frugal.IsEnum(baseType)
+
+	// dereference pointers if necessary
+	var ptr string
+	if field.Modifier == parser.Optional {
+		ptr = "*"
+	}
+
 	if field.Type.IsPrimitive() {
-		var ptr string
-		if field.Modifier == parser.Optional {
-			ptr = "*"
-		}
+		// primitives types
 		contents += fmt.Sprintf("\tif err := frugal.Write%s(oprot, %sp.%s, \"%s\", %d); err != nil {\n", strings.Title(field.Type.Name), ptr, snakeToCamel(field.Name), field.Name, field.ID)
 		contents += fmt.Sprintf("\t\treturn thrift.PrependError(\"%s::%s:%d \", err)", typeName, field.Name, field.ID)
+	} else if isEnum || baseType.IsPrimitive() {
+		// Enum or cast types
+		name := strings.Title(baseType.Name)
+		if isEnum {
+			name = "I32"
+		}
+		contents += fmt.Sprintf("\tif err := frugal.Write%s(oprot, %s(%sp.%s), \"%s\", %d); err != nil {\n",
+			name, thrift2go(baseType.Name, isEnum), ptr, snakeToCamel(field.Name), field.Name, field.ID)
+		contents += fmt.Sprintf("\t\treturn thrift.PrependError(\"%s::%s:%d \", err)", typeName, field.Name, field.ID)
 	} else {
+		// custom type
 		contents += fmt.Sprintf("\tif err := p.writeField%d(oprot); err != nil {\n", field.ID)
 		contents += "\t\treturn err\n"
 	}
-	contents += "\t}\n"
-	return contents
+	return contents + "\t}\n"
 }
 
 func (g *Generator) generateWriteField(structName string, field *parser.Field) string {
-	if field.Type.IsPrimitive() {
+	baseType := g.Frugal.UnderlyingType(field.Type)
+	isEnum := g.Frugal.IsEnum(baseType)
+	if field.Type.IsPrimitive() || isEnum || baseType.IsPrimitive() {
 		return ""
 	}
 	contents := ""

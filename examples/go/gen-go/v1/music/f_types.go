@@ -206,43 +206,17 @@ func (p *Track) Write(oprot thrift.TProtocol) error {
 	if err := frugal.WriteString(oprot, p.Composer, "composer", 4); err != nil {
 		return thrift.PrependError("*music.Track::composer:4 ", err)
 	}
-	if err := p.writeField5(oprot); err != nil {
-		return err
+	if err := frugal.WriteDouble(oprot, float64(p.Duration), "duration", 5); err != nil {
+		return thrift.PrependError("*music.Track::duration:5 ", err)
 	}
-	if err := p.writeField6(oprot); err != nil {
-		return err
+	if err := frugal.WriteI32(oprot, int32(p.Pro), "pro", 6); err != nil {
+		return thrift.PrependError("*music.Track::pro:6 ", err)
 	}
 	if err := oprot.WriteFieldStop(); err != nil {
 		return thrift.PrependError("write field stop error: ", err)
 	}
 	if err := oprot.WriteStructEnd(); err != nil {
 		return thrift.PrependError("write struct stop error: ", err)
-	}
-	return nil
-}
-
-func (p *Track) writeField5(oprot thrift.TProtocol) error {
-	if err := oprot.WriteFieldBegin("duration", thrift.DOUBLE, 5); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field begin error 5:duration: ", p), err)
-	}
-	if err := oprot.WriteDouble(float64(p.Duration)); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T.duration (5) field write error: ", p), err)
-	}
-	if err := oprot.WriteFieldEnd(); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field end error 5:duration: ", p), err)
-	}
-	return nil
-}
-
-func (p *Track) writeField6(oprot thrift.TProtocol) error {
-	if err := oprot.WriteFieldBegin("pro", thrift.I32, 6); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field begin error 6:pro: ", p), err)
-	}
-	if err := oprot.WriteI32(int32(p.Pro)); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T.pro (6) field write error: ", p), err)
-	}
-	if err := oprot.WriteFieldEnd(); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field end error 6:pro: ", p), err)
 	}
 	return nil
 }
@@ -350,8 +324,8 @@ func (p *Album) Write(oprot thrift.TProtocol) error {
 	if err := p.writeField1(oprot); err != nil {
 		return err
 	}
-	if err := p.writeField2(oprot); err != nil {
-		return err
+	if err := frugal.WriteDouble(oprot, float64(p.Duration), "duration", 2); err != nil {
+		return thrift.PrependError("*music.Album::duration:2 ", err)
 	}
 	if err := frugal.WriteString(oprot, p.ASIN, "ASIN", 3); err != nil {
 		return thrift.PrependError("*music.Album::ASIN:3 ", err)
@@ -382,19 +356,6 @@ func (p *Album) writeField1(oprot thrift.TProtocol) error {
 	}
 	if err := oprot.WriteFieldEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write field end error 1:tracks: ", p), err)
-	}
-	return nil
-}
-
-func (p *Album) writeField2(oprot thrift.TProtocol) error {
-	if err := oprot.WriteFieldBegin("duration", thrift.DOUBLE, 2); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:duration: ", p), err)
-	}
-	if err := oprot.WriteDouble(float64(p.Duration)); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T.duration (2) field write error: ", p), err)
-	}
-	if err := oprot.WriteFieldEnd(); err != nil {
-		return thrift.PrependError(fmt.Sprintf("%T write field end error 2:duration: ", p), err)
 	}
 	return nil
 }
