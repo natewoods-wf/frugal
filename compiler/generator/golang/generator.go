@@ -718,7 +718,7 @@ func (g *Generator) generateReadFieldShort(prefix string, field *parser.Field) s
 		var head string
 		if field.Modifier == parser.Optional {
 			ptr = ""
-			head = prefix + fmt.Sprintf("p.%s = new(%s)\n", snakeToCamel(field.Name), field.Type.Name)
+			head = prefix + fmt.Sprintf("p.%s = new(%s)\n", snakeToCamel(field.Name), thrift2go(field.Type.Name, false))
 		}
 		return fmt.Sprintf(head+prefix+"err = frugal.Read%s(iprot, %sp.%s, \"field %d\")\n", strings.Title(field.Type.Name), ptr, snakeToCamel(field.Name), field.ID)
 	}
