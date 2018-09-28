@@ -23,11 +23,11 @@ func ReadBool(p thrift.TProtocol, obj *bool, msg string) error {
 }
 
 // ReadByte reads a byte from p and assigns it to obj.
-func ReadByte(p thrift.TProtocol, obj *byte, msg string) error {
+func ReadByte(p thrift.TProtocol, obj *int8, msg string) error {
 	if v, err := p.ReadByte(); err != nil {
 		return thrift.PrependError("error reading "+msg+":", err)
 	} else {
-		*obj = byte(v)
+		*obj = int8(v)
 	}
 	return nil
 }
@@ -111,11 +111,11 @@ func WriteBool(p thrift.TProtocol, value bool, name string, field int16) error {
 }
 
 // WriteByte writes byte `value` of field name and id `name` and `field` respectively into `p`.
-func WriteByte(p thrift.TProtocol, value byte, name string, field int16) error {
+func WriteByte(p thrift.TProtocol, value int8, name string, field int16) error {
 	if err := p.WriteFieldBegin(name, thrift.BYTE, field); err != nil {
 		return thrift.PrependError("write field begin error: ", err)
 	}
-	if err := p.WriteByte(int8(value)); err != nil {
+	if err := p.WriteByte(value); err != nil {
 		return thrift.PrependError("field write error: ", err)
 	}
 	if err := p.WriteFieldEnd(); err != nil {

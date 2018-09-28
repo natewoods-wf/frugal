@@ -716,7 +716,7 @@ func (g *Generator) generateReadFieldShort(prefix string, field *parser.Field) s
 	if field.Type.IsPrimitive() {
 		ptr := "&"
 		var head string
-		if field.Modifier == parser.Optional {
+		if field.Modifier == parser.Optional && field.Type.Name != "binary" {
 			ptr = ""
 			head = prefix + fmt.Sprintf("p.%s = new(%s)\n", snakeToCamel(field.Name), thrift2go(field.Type.Name, false))
 		}
@@ -948,7 +948,7 @@ func (g *Generator) generateWriteFieldShort(typeName string, field *parser.Field
 
 	// dereference pointers if necessary
 	var ptr string
-	if field.Modifier == parser.Optional {
+	if field.Modifier == parser.Optional && field.Type.Name != "binary" {
 		ptr = "*"
 	}
 
