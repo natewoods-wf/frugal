@@ -962,9 +962,17 @@ func (g *Generator) generateWriteFieldShort(typeName string, field *parser.Field
 		if isEnum {
 			name = "I32"
 		}
-		contents += fmt.Sprintf("\tif err := frugal.Write%s(oprot, %s(%sp.%s), \"%s\", %d); err != nil {\n",
+		prefix := ""
+		if field.Modifier == parser.Optional {
+			prefix = "\t"
+			contents += fmt.Sprintf("\tif p.%s != nil {\n", snakeToCamel(field.Name))
+		}
+		contents += fmt.Sprintf(prefix+"\tif err := frugal.Write%s(oprot, %s(%sp.%s), \"%s\", %d); err != nil {\n",
 			name, thrift2go(baseType.Name, isEnum), ptr, snakeToCamel(field.Name), field.Name, field.ID)
-		contents += fmt.Sprintf("\t\treturn thrift.PrependError(\"%s::%s:%d \", err)", typeName, field.Name, field.ID)
+		contents += fmt.Sprintf(prefix+"\t\treturn thrift.PrependError(\"%s::%s:%d \", err)", typeName, field.Name, field.ID)
+		if field.Modifier == parser.Optional {
+			contents += "\t\t}\n"
+		}
 	} else {
 		// custom type
 		contents += fmt.Sprintf("\tif err := p.writeField%d(oprot); err != nil {\n", field.ID)
