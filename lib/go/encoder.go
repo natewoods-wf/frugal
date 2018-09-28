@@ -82,6 +82,14 @@ func ReadBinary(p thrift.TProtocol, obj *[]byte, msg string) error {
 	return nil
 }
 
+// ReadStruct reads a thrift.TStruct from p and assigns it to obj.
+func ReadStruct(p thrift.TProtocol, obj thrift.TStruct, msg string) error {
+	if err := obj.Read(p); err != nil {
+		return thrift.PrependError("error reading "+msg+":", err)
+	}
+	return nil
+}
+
 // WriteString writes string `value` of field name and id `name` and `field` respectively into `p`.
 func WriteString(p thrift.TProtocol, value, name string, field int16) error {
 	if err := p.WriteFieldBegin(name, thrift.STRING, field); err != nil {
@@ -186,6 +194,20 @@ func WriteBinary(p thrift.TProtocol, value []byte, name string, field int16) err
 		return thrift.PrependError("write field begin error: ", err)
 	}
 	if err := p.WriteBinary(value); err != nil {
+		return thrift.PrependError("field write error: ", err)
+	}
+	if err := p.WriteFieldEnd(); err != nil {
+		return thrift.PrependError("write field end error: ", err)
+	}
+	return nil
+}
+
+// WriteStruct writes thrift.Struct of filed and id `name` and `field` respectively into `p`.
+func WriteStruct(p thrift.TProtocol, value thrift.TStruct, name string, field int16) error {
+	if err := p.WriteFieldBegin(name, thrift.STRUCT, field); err != nil {
+		return thrift.PrependError("write field begin error: ", err)
+	}
+	if err := value.Write(p); err != nil {
 		return thrift.PrependError("field write error: ", err)
 	}
 	if err := p.WriteFieldEnd(); err != nil {

@@ -713,20 +713,28 @@ func (g *Generator) generateToString(s *parser.Struct, sName string) string {
 }
 
 func (g *Generator) generateReadFieldShort(prefix string, field *parser.Field) string {
-	if field.Type.IsPrimitive() {
+	isStruct := g.Frugal.IsStruct(g.Frugal.UnderlyingType(field.Type))
+	if field.Type.IsPrimitive() || isStruct {
 		ptr := "&"
 		var head string
-		if field.Modifier == parser.Optional && field.Type.Name != "binary" {
+		if isStruct {
+			ptr = ""
+			head = prefix + fmt.Sprintf("p.%s = New%s()\n", snakeToCamel(field.Name), g.qualifiedTypeName(field.Type))
+		} else if field.Modifier == parser.Optional && field.Type.Name != "binary" {
 			ptr = ""
 			head = prefix + fmt.Sprintf("p.%s = new(%s)\n", snakeToCamel(field.Name), thrift2go(field.Type.Name, false))
 		}
-		return fmt.Sprintf(head+prefix+"err = frugal.Read%s(iprot, %sp.%s, \"field %d\")\n", strings.Title(field.Type.Name), ptr, snakeToCamel(field.Name), field.ID)
+		name := strings.Title(field.Type.Name)
+		if isStruct {
+			name = "Struct"
+		}
+		return fmt.Sprintf(head+prefix+"err = frugal.Read%s(iprot, %sp.%s, \"field %d\")\n", name, ptr, snakeToCamel(field.Name), field.ID)
 	}
 	return fmt.Sprintf(prefix+"err = p.ReadField%d(iprot)\n", field.ID)
 }
 
 func (g *Generator) generateReadField(structName string, field *parser.Field) string {
-	if field.Type.IsPrimitive() {
+	if field.Type.IsPrimitive() || g.Frugal.IsStruct(g.Frugal.UnderlyingType(field.Type)) {
 		return ""
 	}
 	contents := fmt.Sprintf("func (p *%s) ReadField%d(iprot thrift.TProtocol) error {\n", structName, field.ID)
@@ -956,6 +964,10 @@ func (g *Generator) generateWriteFieldShort(typeName string, field *parser.Field
 		// primitives types
 		contents += fmt.Sprintf("\tif err := frugal.Write%s(oprot, %sp.%s, \"%s\", %d); err != nil {\n", strings.Title(field.Type.Name), ptr, snakeToCamel(field.Name), field.Name, field.ID)
 		contents += fmt.Sprintf("\t\treturn thrift.PrependError(\"%s::%s:%d \", err)", typeName, field.Name, field.ID)
+	} else if g.Frugal.IsStruct(baseType) {
+		// struct encoding
+		contents += fmt.Sprintf("\tif err := frugal.WriteStruct(oprot, p.%s, \"%s\", %d); err != nil {\n", snakeToCamel(field.Name), field.Name, field.ID)
+		contents += fmt.Sprintf("\t\treturn thrift.PrependError(\"%s::%s:%d \", err)", typeName, field.Name, field.ID)
 	} else if isEnum || baseType.IsPrimitive() {
 		// Enum or cast types
 		name := strings.Title(baseType.Name)
@@ -984,7 +996,7 @@ func (g *Generator) generateWriteFieldShort(typeName string, field *parser.Field
 func (g *Generator) generateWriteField(structName string, field *parser.Field) string {
 	baseType := g.Frugal.UnderlyingType(field.Type)
 	isEnum := g.Frugal.IsEnum(baseType)
-	if field.Type.IsPrimitive() || isEnum || baseType.IsPrimitive() {
+	if field.Type.IsPrimitive() || isEnum || baseType.IsPrimitive() || g.Frugal.IsStruct(baseType) {
 		return ""
 	}
 	contents := ""
