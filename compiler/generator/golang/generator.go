@@ -712,6 +712,15 @@ func (g *Generator) generateToString(s *parser.Struct, sName string) string {
 	return contents
 }
 
+// Add New to the fully qualified name, if in an external package add it after the dot
+func n2c(name string) string {
+	idx := strings.IndexByte(name, '.')
+	if idx < 0 {
+		return "New" + name
+	}
+	return name[:idx+1] + "New" + name[idx+1:]
+}
+
 func (g *Generator) generateReadFieldShort(prefix string, field *parser.Field) string {
 	isStruct := g.Frugal.IsStruct(g.Frugal.UnderlyingType(field.Type))
 	if field.Type.IsPrimitive() || isStruct {
@@ -719,7 +728,7 @@ func (g *Generator) generateReadFieldShort(prefix string, field *parser.Field) s
 		var head string
 		if isStruct {
 			ptr = ""
-			head = prefix + fmt.Sprintf("p.%s = New%s()\n", snakeToCamel(field.Name), g.qualifiedTypeName(field.Type))
+			head = prefix + fmt.Sprintf("p.%s = %s()\n", snakeToCamel(field.Name), n2c(g.qualifiedTypeName(field.Type)))
 		} else if field.Modifier == parser.Optional && field.Type.Name != "binary" {
 			ptr = ""
 			head = prefix + fmt.Sprintf("p.%s = new(%s)\n", snakeToCamel(field.Name), thrift2go(field.Type.Name, false))
@@ -956,7 +965,7 @@ func (g *Generator) generateWriteFieldShort(typeName string, field *parser.Field
 
 	// dereference pointers if necessary
 	var ptr string
-	if field.Modifier == parser.Optional && field.Type.Name != "binary" {
+	if g.isPointerField(field) {
 		ptr = "*"
 	}
 
@@ -975,14 +984,14 @@ func (g *Generator) generateWriteFieldShort(typeName string, field *parser.Field
 			name = "I32"
 		}
 		prefix := ""
-		if field.Modifier == parser.Optional {
+		if field.Modifier == parser.Optional && !baseType.IsPrimitive() {
 			prefix = "\t"
 			contents += fmt.Sprintf("\tif p.%s != nil {\n", snakeToCamel(field.Name))
 		}
 		contents += fmt.Sprintf(prefix+"\tif err := frugal.Write%s(oprot, %s(%sp.%s), \"%s\", %d); err != nil {\n",
 			name, thrift2go(baseType.Name, isEnum), ptr, snakeToCamel(field.Name), field.Name, field.ID)
 		contents += fmt.Sprintf(prefix+"\t\treturn thrift.PrependError(\"%s::%s:%d \", err)", typeName, field.Name, field.ID)
-		if field.Modifier == parser.Optional {
+		if field.Modifier == parser.Optional && !baseType.IsPrimitive() {
 			contents += "\t\t}\n"
 		}
 	} else {
@@ -1798,14 +1807,17 @@ func (g *Generator) generateClientMethod(service *parser.Service, method *parser
 	contents += fmt.Sprintf("\targs := %s%sArgs{\n", servTitle, nameTitle)
 	contents += g.generateStructArgs(method.Arguments)
 	contents += "\t}\n"
-	contents += fmt.Sprintf("\tres := %s%sResult{}\n", servTitle, nameTitle)
 
 	// Invoke the Invocation
 	msgType := "CALL"
+	resType := "&res"
 	if method.Oneway {
 		msgType = "ONEWAY"
+		resType = "nil"
+	} else {
+		contents += fmt.Sprintf("\tres := %s%sResult{}\n", servTitle, nameTitle)
 	}
-	contents += fmt.Sprintf("\tif err := f.base.Invoke(f.%s, \"%s\", thrift.%s, ctx, &args, &res); err != nil {\n", nameTitle, nameLower, msgType)
+	contents += fmt.Sprintf("\tif err := f.base.Invoke(f.%s, \"%s\", thrift.%s, ctx, &args, %s); err != nil {\n", nameTitle, nameLower, msgType, resType)
 	if method.ReturnType == nil {
 		contents += "\t\treturn err\n"
 	} else {
