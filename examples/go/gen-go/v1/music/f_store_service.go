@@ -67,7 +67,7 @@ func (f *FStoreClient) EnterAlbumGiveaway(ctx frugal.FContext, email string, nam
 	return res.GetSuccess(), nil
 }
 
-func fStoreBuyAlbumHandler(svc interface{}, ctx frugal.FContext, dec func(interface{}) error) (interface{}, error) {
+func fStoreBuyAlbumHandler(svc interface{}, ctx frugal.FContext, dec func(thrift.TStruct) error) (thrift.TStruct, error) {
 	args := &StoreBuyAlbumArgs{}
 	if err := dec(args); err != nil {
 		return nil, err
@@ -115,7 +115,7 @@ var fStoreServiceDescriptor = frugal.ServiceDesc{
 }
 
 // NewFStoreProcessor2 is an example of the code the generator could write if we standardize some thing
-func NewFStoreProcessor2(handler FStore, middleware ...frugal.ServiceMiddleware) frugal.FProcessor {
+func NewFStoreProcessor(handler FStore, middleware ...frugal.ServiceMiddleware) frugal.FProcessor {
 	return frugal.NewFProcessor(&fStoreServiceDescriptor, handler, middleware)
 }
 
@@ -123,7 +123,7 @@ type FStoreProcessor struct {
 	*frugal.FBaseProcessor
 }
 
-func NewFStoreProcessor(handler FStore, middleware ...frugal.ServiceMiddleware) *FStoreProcessor {
+func NewFStoreProcessor2(handler FStore, middleware ...frugal.ServiceMiddleware) *FStoreProcessor {
 	p := &FStoreProcessor{frugal.NewFBaseProcessor()}
 	p.AddToProcessorMap("buyAlbum", &storeFBuyAlbum{frugal.NewFBaseProcessorFunction(p.GetWriteMutex(), frugal.NewMethod(handler, handler.BuyAlbum, "BuyAlbum", middleware))})
 	p.AddToProcessorMap("enterAlbumGiveaway", &storeFEnterAlbumGiveaway{frugal.NewFBaseProcessorFunction(p.GetWriteMutex(), frugal.NewMethod(handler, handler.EnterAlbumGiveaway, "EnterAlbumGiveaway", middleware))})

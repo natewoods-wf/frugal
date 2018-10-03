@@ -190,7 +190,7 @@ func WriteI64(p thrift.TProtocol, value int64, name string, field int16) error {
 
 // WriteBinary writes []byte `value` of field name and id `name` and `field` respectively into `p`.
 func WriteBinary(p thrift.TProtocol, value []byte, name string, field int16) error {
-	if err := p.WriteFieldBegin(name, thrift.BINARY, field); err != nil {
+	if err := p.WriteFieldBegin(name, thrift.UTF8, field); err != nil {
 		return thrift.PrependError("write field begin error: ", err)
 	}
 	if err := p.WriteBinary(value); err != nil {
