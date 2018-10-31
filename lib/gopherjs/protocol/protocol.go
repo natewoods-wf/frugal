@@ -47,8 +47,6 @@ type Buffer interface {
 	Set(error)
 	Err() error
 	Data() []byte
-	Push(string) // error context
-	Pop()        // error context
 
 	WriteMessageBegin(name string, typeID TMessageType, seqID int32)
 	WriteMessageEnd()
