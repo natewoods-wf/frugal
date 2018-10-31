@@ -516,6 +516,7 @@ func (g *Generator) generateConstructor(s *parser.Struct, sName string) string {
 }
 
 func (g *Generator) generateGetters(s *parser.Struct, sName string) string {
+	return ""
 	contents := ""
 
 	for _, field := range s.Fields {
@@ -575,24 +576,25 @@ func (g *Generator) generateGetters(s *parser.Struct, sName string) string {
 func (g *Generator) generateCountSetFields(s *parser.Struct, sName string) string {
 	contents := ""
 
-	if s.Type == parser.StructTypeUnion {
-		contents += fmt.Sprintf("func (p *%s) CountSetFields%s() int {\n", sName, sName)
-		contents += "\tcount := 0\n"
-		for _, field := range s.Fields {
-			contents += fmt.Sprintf("\tif p.IsSet%s() {\n", title(field.Name))
-			contents += "\t\tcount++\n"
-			contents += "\t}\n"
-		}
-		contents += "\treturn count\n"
-		contents += "}\n\n"
-	}
+	// if s.Type == parser.StructTypeUnion {
+	// 	contents += fmt.Sprintf("func (p *%s) CountSetFields%s() int {\n", sName, sName)
+	// 	contents += "\tcount := 0\n"
+	// 	for _, field := range s.Fields {
+	// 		contents += fmt.Sprintf("\tif p.IsSet%s() {\n", title(field.Name))
+	// 		contents += "\t\tcount++\n"
+	// 		contents += "\t}\n"
+	// 	}
+	// 	contents += "\treturn count\n"
+	// 	contents += "}\n\n"
+	// }
 	return contents
 }
 
 const structTemplate = `
+// Unpack deserializes {{.Name}} objects.
 func (p *{{.Name}}) Unpack(prot frugal.Protocol) {
   prot.UnpackStructBegin("{{.Name}}")
-  for typeID, id := prot.UnpackFieldBegin(); typeID != thrift.STOP; typeID, id = prot.UnpackFieldBegin() {
+  for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
     switch id {
     {{range .Fields -}}
     case {{.ID}}:
@@ -606,6 +608,7 @@ func (p *{{.Name}}) Unpack(prot frugal.Protocol) {
   prot.UnpackStructEnd()
 }
 
+// Pack serializes {{.Name}} objects.
 func (p *{{.Name}}) Pack(prot frugal.Protocol) {
   prot.PackStructBegin("{{.Name}}")
   // TODO: write fields
@@ -619,7 +622,7 @@ func (g *Generator) generateRead(s *parser.Struct, sName string) string {
 
 	var funcMap = template.FuncMap{
 		"unpackField": func(field *parser.Field) string {
-			return g.generateReadFieldRec(field, true, "v")
+			return g.generateReadFieldRec(field, true)
 		},
 	}
 
@@ -702,6 +705,7 @@ func (g *Generator) generateRead(s *parser.Struct, sName string) string {
 }
 
 func (g *Generator) generateWrite(s *parser.Struct, sName string) string {
+	return ""
 	contents := fmt.Sprintf("func (p *%s) Write(oprot thrift.TProtocol) error {\n", sName)
 
 	// Only one field can be set for a union, make sure that's the case
@@ -758,7 +762,7 @@ func (g *Generator) generateReadField(structName string, field *parser.Field) st
 	// return contents
 }
 
-func (g *Generator) generateReadFieldRec(field *parser.Field, first bool, variable string) string {
+func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string {
 	// first indicates if this is the first recursive call
 	// first time calls assign to struct members instead of generating variables
 	eq := ":="
@@ -821,7 +825,7 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool, variab
 				contents += fmt.Sprintf("\t v := prot.Unpack%s()\n", thriftType)
 				contents += fmt.Sprintf("\t\t%s%s = &v\n", prefix, fName)
 			} else {
-				contents += fmt.Sprintf("\t\t%s%s = prot.Unpack%s()\n", prefix, fName, thriftType)
+				contents += fmt.Sprintf("\t\t%s%s %s prot.Unpack%s()\n", prefix, fName, eq, thriftType)
 			}
 		} else if isPointerField {
 			contents += fmt.Sprintf("\t\ttemp := %s(prot.Unpack%s())\n", cast, thriftType)
@@ -870,7 +874,7 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool, variab
 			valElem := g.GetElem()
 			valField := parser.FieldFromType(underlyingType.ValueType, valElem)
 			valField.Name = fmt.Sprintf("(%s%s%s)[i]", maybePointer, prefix, fName)
-			contents += g.generateReadFieldRec(valField, false, valElem)
+			contents += g.generateReadFieldRec(valField, false)
 			// contents += fmt.Sprintf("\t\t%s%s%s = append(%s%s%s, %s)\n", maybePointer, prefix, fName, maybePointer, prefix, fName, valElem)
 			contents += "\t}\n"
 			contents += "\tprot.UnpackListEnd()\n"
@@ -888,7 +892,7 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool, variab
 			contents += "\tfor i := 0; i < size; i++ {\n"
 			valElem := g.GetElem()
 			valField := parser.FieldFromType(underlyingType.ValueType, valElem)
-			valContents := g.generateReadFieldRec(valField, false, valElem)
+			valContents := g.generateReadFieldRec(valField, false)
 			contents += valContents
 			contents += fmt.Sprintf("\t\t(%s%s%s)[%s] = true\n", maybePointer, prefix, fName, valElem)
 			contents += "\t}\n"
@@ -909,11 +913,11 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool, variab
 			contents += "\tfor i := 0; i < size; i++ {\n"
 			keyElem := g.GetElem()
 			keyField := parser.FieldFromType(underlyingType.KeyType, keyElem)
-			contents += g.generateReadFieldRec(keyField, false, keyElem)
+			contents += g.generateReadFieldRec(keyField, false)
 			// TODO 2.0 use the valContents for all the collections
 			valElem := g.GetElem()
 			valField := parser.FieldFromType(underlyingType.ValueType, valElem)
-			contents += g.generateReadFieldRec(valField, false, valElem)
+			contents += g.generateReadFieldRec(valField, false)
 			contents += fmt.Sprintf("\t\t(%s%s%s)[%s] = %s\n", maybePointer, prefix, fName, keyElem, valElem)
 			contents += "\t}\n"
 			contents += "\tprot.UnpackMapEnd()\n"
@@ -1597,7 +1601,7 @@ func (g *Generator) generateSubscribeMethod(scope *parser.Scope, op *parser.Oper
 	subscriber += "\t\t\tiprot.ReadMessageEnd()\n"
 	subscriber += "\t\t\treturn thrift.NewTApplicationException(frugal.APPLICATION_EXCEPTION_UNKNOWN_METHOD, \"Unknown function\"+name)\n"
 	subscriber += "\t\t}\n"
-	subscriber += g.generateReadFieldRec(parser.FieldFromType(op.Type, "req"), false, "v")
+	subscriber += g.generateReadFieldRec(parser.FieldFromType(op.Type, "req"), false)
 	subscriber += "\t\tiprot.ReadMessageEnd()\n\n"
 	subscriber += "\t\treturn method.Invoke([]interface{}{ctx, req}).Error()\n"
 	subscriber += "\t}\n"
