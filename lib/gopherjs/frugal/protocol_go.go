@@ -36,8 +36,8 @@ func (ce *contextualizedError) Error() string {
 	return strings.Join(ce.ctx, ".") + ": " + ce.err.Error()
 }
 
-func (b *protocol) push(name string) { b.ctx = append(b.ctx, name) }
-func (b *protocol) pop()             { b.ctx = b.ctx[:len(b.ctx)-2] }
+func (b *protocol) Push(name string) { b.ctx = append(b.ctx, name) }
+func (b *protocol) Pop()             { b.ctx = b.ctx[:len(b.ctx)-2] }
 
 func (b *protocol) wrap(name string) {
 	switch b.err.(type) {
@@ -53,7 +53,7 @@ func (b *protocol) wrap(name string) {
 
 func (b *protocol) PackMessageBegin(name string, typeID TMessageType, seqID int32) {
 	if b.err == nil {
-		b.push(name)
+		b.Push(name)
 		b.err = b.pro.WriteMessageBegin(name, thrift.TMessageType(typeID), seqID)
 		b.wrap("writeMessageBegin")
 	}
@@ -63,13 +63,13 @@ func (b *protocol) PackMessageEnd() {
 	if b.err == nil {
 		b.err = b.pro.WriteMessageEnd()
 		b.wrap("writeMessageEnd")
-		b.pop()
+		b.Pop()
 	}
 }
 
 func (b *protocol) PackStructBegin(name string) {
 	if b.err == nil {
-		b.push(name)
+		b.Push(name)
 		b.err = b.pro.WriteStructBegin(name)
 		b.wrap("writeStructBegin")
 	}
@@ -79,13 +79,13 @@ func (b *protocol) PackStructEnd() {
 	if b.err == nil {
 		b.err = b.pro.WriteStructEnd()
 		b.wrap("writeStructEnd")
-		b.pop()
+		b.Pop()
 	}
 }
 
 func (b *protocol) PackFieldBegin(name string, typeID TType, id int16) {
 	if b.err == nil {
-		b.push(name)
+		b.Push(name)
 		b.err = b.pro.WriteFieldBegin(name, thrift.TType(typeID), id)
 		b.wrap("writeFieldBegin")
 	}
@@ -95,7 +95,7 @@ func (b *protocol) PackFieldEnd() {
 	if b.err == nil {
 		b.err = b.pro.WriteFieldEnd()
 		b.wrap("writeFieldEnd")
-		b.pop()
+		b.Pop()
 	}
 }
 
@@ -221,8 +221,9 @@ func (b *protocol) UnpackMessageEnd() {
 	}
 }
 
-func (b *protocol) UnpackStructBegin() {
+func (b *protocol) UnpackStructBegin(name string) {
 	if b.err == nil {
+		b.Push(name)
 		_, b.err = b.pro.ReadStructBegin()
 		b.wrap("readStructBegin")
 	}
@@ -232,10 +233,14 @@ func (b *protocol) UnpackStructEnd() {
 	if b.err == nil {
 		b.err = b.pro.ReadStructEnd()
 		b.wrap("readStructEnd")
+		b.Pop()
 	}
 }
 
 func (b *protocol) UnpackFieldBegin() (typeID TType, id int16) {
+	if b.err != nil {
+		return STOP, 0
+	}
 	if b.err == nil {
 		var typeID2 thrift.TType
 		_, typeID2, id, b.err = b.pro.ReadFieldBegin()

@@ -45,6 +45,8 @@ type Protocol interface {
 	Set(error)
 	Err() error
 	Data() []byte
+	Push(string)
+	Pop()
 
 	PackMessageBegin(name string, typeID TMessageType, seqID int32)
 	PackMessageEnd()
@@ -70,7 +72,7 @@ type Protocol interface {
 
 	UnpackMessageBegin() (name string, typeID TMessageType, seqID int32)
 	UnpackMessageEnd()
-	UnpackStructBegin() // name not-used
+	UnpackStructBegin(name string) // name not-used
 	UnpackStructEnd()
 	UnpackFieldBegin() (typeID TType, id int16) // name not-used
 	UnpackFieldEnd()
