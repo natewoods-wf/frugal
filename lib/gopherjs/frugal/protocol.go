@@ -46,48 +46,48 @@ type Protocol interface {
 	Err() error
 	Data() []byte
 
-	WriteMessageBegin(name string, typeID TMessageType, seqID int32)
-	WriteMessageEnd()
-	WriteStructBegin(name string)
-	WriteStructEnd()
-	WriteFieldBegin(name string, typeID TType, id int16)
-	WriteFieldEnd()
-	WriteFieldStop()
-	WriteMapBegin(keyType TType, valueType TType, size int)
-	WriteMapEnd()
-	WriteListBegin(elemType TType, size int)
-	WriteListEnd()
-	WriteSetBegin(elemType TType, size int)
-	WriteSetEnd()
-	WriteBool(bool)
-	WriteByte(int8)
-	WriteI16(int16)
-	WriteI32(int32)
-	WriteI64(int64)
-	WriteDouble(float64)
-	WriteString(string)
-	WriteBinary([]byte)
+	PackMessageBegin(name string, typeID TMessageType, seqID int32)
+	PackMessageEnd()
+	PackStructBegin(name string)
+	PackStructEnd()
+	PackFieldBegin(name string, typeID TType, id int16)
+	PackFieldEnd()
+	PackFieldStop()
+	PackMapBegin(keyType TType, valueType TType, size int)
+	PackMapEnd()
+	PackListBegin(elemType TType, size int)
+	PackListEnd()
+	PackSetBegin(elemType TType, size int)
+	PackSetEnd()
+	PackBool(bool)
+	PackByte(int8)
+	PackI16(int16)
+	PackI32(int32)
+	PackI64(int64)
+	PackDouble(float64)
+	PackString(string)
+	PackBinary([]byte)
 
-	ReadMessageBegin() (name string, typeID TMessageType, seqID int32)
-	ReadMessageEnd()
-	ReadStructBegin() // name not-used
-	ReadStructEnd()
-	ReadFieldBegin() (typeID TType, id int16) // name not-used
-	ReadFieldEnd()
-	ReadMapBegin() (size int) // keyType, valueType not-used
-	ReadMapEnd()
-	ReadListBegin() (size int) // elemType not-used
-	ReadListEnd()
-	ReadSetBegin() (size int) // elemType not-used
-	ReadSetEnd()
-	ReadBool() bool
-	ReadByte() int8
-	ReadI16() int16
-	ReadI32() int32
-	ReadI64() int64
-	ReadDouble() float64
-	ReadString() string
-	ReadBinary() []byte
+	UnpackMessageBegin() (name string, typeID TMessageType, seqID int32)
+	UnpackMessageEnd()
+	UnpackStructBegin() // name not-used
+	UnpackStructEnd()
+	UnpackFieldBegin() (typeID TType, id int16) // name not-used
+	UnpackFieldEnd()
+	UnpackMapBegin() (size int) // keyType, valueType not-used
+	UnpackMapEnd()
+	UnpackListBegin() (size int) // elemType not-used
+	UnpackListEnd()
+	UnpackSetBegin() (size int) // elemType not-used
+	UnpackSetEnd()
+	UnpackBool() bool
+	UnpackByte() int8
+	UnpackI16() int16
+	UnpackI32() int32
+	UnpackI64() int64
+	UnpackDouble() float64
+	UnpackString() string
+	UnpackBinary() []byte
 
 	Skip(fieldType TType)
 	Flush()
