@@ -32,14 +32,13 @@ import (
 )
 
 const (
-	lang                = "go"
-	defaultOutputDir    = "gen-go"
+	lang                = "gopherjs"
+	defaultOutputDir    = "gen-gopherjs"
 	serviceSuffix       = "_service"
 	scopeSuffix         = "_scope"
 	packagePrefixOption = "package_prefix"
 	thriftImportOption  = "thrift_import"
 	frugalImportOption  = "frugal_import"
-	asyncOption         = "async"
 	useVendorOption     = "use_vendor"
 	slimOption          = "slim"
 )
@@ -426,21 +425,78 @@ func (g *Generator) generateServiceArgsResults(service *parser.Service) string {
 	return contents
 }
 
+const structTemplate = `
+// {{.Name}} is a frual serializable object.
+type {{.Name}} struct {
+	{{range .Fields -}}
+	{{.Name}} {{fieldType .}}
+	{{end}}
+}
+
+// New{{.Name}} constructs a {{.Name}}.
+func New{{.Name}}() *{{.Name}} {
+	return &{{.Name}}{
+		// TODO: default values
+	}
+}
+
+// Unpack deserializes {{.Name}} objects.
+func (p *{{.Name}}) Unpack(prot frugal.Protocol) {
+  prot.UnpackStructBegin("{{.Name}}")
+  for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
+    switch id {
+    {{range .Fields -}}
+    case {{.ID}}:
+      {{unpackField . -}}
+    {{end -}}
+    default:
+      prot.Skip(typeID)
+    }
+    prot.UnpackFieldEnd()
+  }
+  prot.UnpackStructEnd()
+}
+
+// Pack serializes {{.Name}} objects.
+func (p *{{.Name}}) Pack(prot frugal.Protocol) {
+  prot.PackStructBegin("{{.Name}}")
+	{{range .Fields -}}
+	{{packField .}}
+	{{end -}}
+  prot.PackStructEnd()
+}
+`
+
 func (g *Generator) generateStruct(s *parser.Struct, serviceName string) string {
-	contents := ""
+	// contents += g.generateGetters(s, sName)
+	// contents += g.generateCountSetFields(s, sName)
+	// contents += g.generateWrite(s, sName)
 
-	sName := titleServiceName(s.Name, serviceName)
-	contents += g.generateStructDeclaration(s, sName)
-	contents += g.generateConstructor(s, sName)
+	// Fix the names of fields
+	for _, field := range s.Fields {
+		field.Name = title(field.Name)
+	}
 
-	contents += g.generateGetters(s, sName)
-	contents += g.generateCountSetFields(s, sName)
+	// TODO: cache the template!
+	var funcMap = template.FuncMap{
+		"unpackField": func(field *parser.Field) string {
+			return g.generateReadFieldRec(field, true)
+		},
+		"fieldType": func(field *parser.Field) string {
+			return g.getGoTypeFromThriftTypePtr(field.Type, g.isPointerField(field))
+		},
+		"packField": func(field *parser.Field) string {
+			return "// TODO: pack " + field.Name
+		},
+	}
+	var readTemplate = template.Must(template.New("read").Funcs(funcMap).Parse(structTemplate))
 
-	contents += g.generateRead(s, sName)
-	contents += g.generateWrite(s, sName)
-	contents += g.generateToString(s, sName)
-
-	return contents
+	// actually process the template
+	buff := bytes.NewBuffer(nil)
+	if err := readTemplate.Execute(buff, s); err != nil {
+		panic(err)
+	}
+	return buff.String()
 }
 
 func (g *Generator) generateCommentWithDeprecated(comment []string, indent string, anns parser.Annotations) string {
@@ -517,58 +573,58 @@ func (g *Generator) generateConstructor(s *parser.Struct, sName string) string {
 
 func (g *Generator) generateGetters(s *parser.Struct, sName string) string {
 	return ""
-	contents := ""
-
-	for _, field := range s.Fields {
-		fName := title(field.Name)
-		isPointer := g.isPointerField(field)
-		// goType := g.getGoTypeFromThriftTypePtr(field.Type, false)
-		// goPtrType := g.getGoTypeFromThriftTypePtr(field.Type, true)
-		underlyingType := g.Frugal.UnderlyingType(field.Type)
-
-		if field.Modifier == parser.Optional || isPointer {
-			// // Generate a default for getters
-			// contents += fmt.Sprintf("var %s_%s_DEFAULT %s", sName, fName, goType)
-			// if field.Default != nil {
-			// 	val := g.generateConstantValue(field.Type, field.Default)
-			// 	contents += fmt.Sprintf(" = %s", val)
-			// }
-			// contents += "\n\n"
-
-			// Determines if the field is set
-			contents += fmt.Sprintf("func (p *%s) IsSet%s() bool {\n", sName, fName)
-			if isPointer || underlyingType.IsContainer() || (underlyingType.Name == "binary" && field.Default == nil) {
-				// Compare these to nil
-				contents += fmt.Sprintf("\treturn p.%s != nil\n", fName)
-			} else if underlyingType.Name == "binary" {
-				// Binary fields are byte slices, can't compare slices with ==
-				contents += fmt.Sprintf("\treturn !bytes.Equal(p.%s, %s_%s_DEFAULT)\n", fName, sName, fName)
-			} else {
-				// Otherwise compare to default
-				contents += fmt.Sprintf("\treturn p.%s != %s_%s_DEFAULT\n", fName, sName, fName)
-			}
-			contents += "}\n\n"
-		}
-		// if isPointer {
-		// 	// Need to dereference the field before returning if it's a pointer
-		// 	maybePointer := ""
-		// 	if goType != goPtrType {
-		// 		maybePointer = "*"
-		// 	}
-		// 	contents += fmt.Sprintf("func (p *%s) Get%s() %s {\n", sName, fName, goType)
-		// 	contents += fmt.Sprintf("\tif !p.IsSet%s() {\n", fName)
-		// 	contents += fmt.Sprintf("\t\treturn %s_%s_DEFAULT\n", sName, fName)
-		// 	contents += "\t}\n"
-		// 	contents += fmt.Sprintf("\treturn %sp.%s\n", maybePointer, fName)
-		// 	contents += "}\n\n"
-		//
-		// } else {
-		// 	contents += fmt.Sprintf("func (p *%s) Get%s() %s {\n", sName, fName, g.getGoTypeFromThriftType(field.Type))
-		// 	contents += fmt.Sprintf("\treturn p.%s\n", fName)
-		// 	contents += "}\n\n"
-		// }
-	}
-	return contents
+	// contents := ""
+	//
+	// for _, field := range s.Fields {
+	// 	fName := title(field.Name)
+	// 	isPointer := g.isPointerField(field)
+	// 	// goType := g.getGoTypeFromThriftTypePtr(field.Type, false)
+	// 	// goPtrType := g.getGoTypeFromThriftTypePtr(field.Type, true)
+	// 	underlyingType := g.Frugal.UnderlyingType(field.Type)
+	//
+	// 	if field.Modifier == parser.Optional || isPointer {
+	// 		// // Generate a default for getters
+	// 		// contents += fmt.Sprintf("var %s_%s_DEFAULT %s", sName, fName, goType)
+	// 		// if field.Default != nil {
+	// 		// 	val := g.generateConstantValue(field.Type, field.Default)
+	// 		// 	contents += fmt.Sprintf(" = %s", val)
+	// 		// }
+	// 		// contents += "\n\n"
+	//
+	// 		// Determines if the field is set
+	// 		contents += fmt.Sprintf("func (p *%s) IsSet%s() bool {\n", sName, fName)
+	// 		if isPointer || underlyingType.IsContainer() || (underlyingType.Name == "binary" && field.Default == nil) {
+	// 			// Compare these to nil
+	// 			contents += fmt.Sprintf("\treturn p.%s != nil\n", fName)
+	// 		} else if underlyingType.Name == "binary" {
+	// 			// Binary fields are byte slices, can't compare slices with ==
+	// 			contents += fmt.Sprintf("\treturn !bytes.Equal(p.%s, %s_%s_DEFAULT)\n", fName, sName, fName)
+	// 		} else {
+	// 			// Otherwise compare to default
+	// 			contents += fmt.Sprintf("\treturn p.%s != %s_%s_DEFAULT\n", fName, sName, fName)
+	// 		}
+	// 		contents += "}\n\n"
+	// 	}
+	// 	// if isPointer {
+	// 	// 	// Need to dereference the field before returning if it's a pointer
+	// 	// 	maybePointer := ""
+	// 	// 	if goType != goPtrType {
+	// 	// 		maybePointer = "*"
+	// 	// 	}
+	// 	// 	contents += fmt.Sprintf("func (p *%s) Get%s() %s {\n", sName, fName, goType)
+	// 	// 	contents += fmt.Sprintf("\tif !p.IsSet%s() {\n", fName)
+	// 	// 	contents += fmt.Sprintf("\t\treturn %s_%s_DEFAULT\n", sName, fName)
+	// 	// 	contents += "\t}\n"
+	// 	// 	contents += fmt.Sprintf("\treturn %sp.%s\n", maybePointer, fName)
+	// 	// 	contents += "}\n\n"
+	// 	//
+	// 	// } else {
+	// 	// 	contents += fmt.Sprintf("func (p *%s) Get%s() %s {\n", sName, fName, g.getGoTypeFromThriftType(field.Type))
+	// 	// 	contents += fmt.Sprintf("\treturn p.%s\n", fName)
+	// 	// 	contents += "}\n\n"
+	// 	// }
+	// }
+	// return contents
 }
 
 // generateCountSetFields generates a helper function to determine how many
@@ -590,48 +646,8 @@ func (g *Generator) generateCountSetFields(s *parser.Struct, sName string) strin
 	return contents
 }
 
-const structTemplate = `
-// Unpack deserializes {{.Name}} objects.
-func (p *{{.Name}}) Unpack(prot frugal.Protocol) {
-  prot.UnpackStructBegin("{{.Name}}")
-  for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
-    switch id {
-    {{range .Fields -}}
-    case {{.ID}}:
-      {{unpackField . -}}
-    {{end -}}
-    default:
-      prot.Skip(typeID)
-    }
-    prot.UnpackFieldEnd()
-  }
-  prot.UnpackStructEnd()
-}
-
-// Pack serializes {{.Name}} objects.
-func (p *{{.Name}}) Pack(prot frugal.Protocol) {
-  prot.PackStructBegin("{{.Name}}")
-  // TODO: write fields
-  prot.PackStructEnd()
-}
-
-`
-
 func (g *Generator) generateRead(s *parser.Struct, sName string) string {
 	contents := ""
-
-	var funcMap = template.FuncMap{
-		"unpackField": func(field *parser.Field) string {
-			return g.generateReadFieldRec(field, true)
-		},
-	}
-
-	var readTemplate = template.Must(template.New("read").Funcs(funcMap).Parse(structTemplate))
-	buff := bytes.NewBuffer(nil)
-	if err := readTemplate.Execute(buff, s); err != nil {
-		panic(err)
-	}
-	contents += buff.String()
 
 	// contents += fmt.Sprintf("func (p *%s) Read(iprot thrift.TProtocol) error {\n", sName)
 	// contents += "\tif _, err := iprot.ReadStructBegin(); err != nil {\n"
@@ -706,59 +722,37 @@ func (g *Generator) generateRead(s *parser.Struct, sName string) string {
 
 func (g *Generator) generateWrite(s *parser.Struct, sName string) string {
 	return ""
-	contents := fmt.Sprintf("func (p *%s) Write(oprot thrift.TProtocol) error {\n", sName)
-
-	// Only one field can be set for a union, make sure that's the case
-	if s.Type == parser.StructTypeUnion {
-		contents += fmt.Sprintf("\tif c := p.CountSetFields%s(); c != 1 {\n", sName)
-		contents += "\t\treturn thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf(\"%T write union: exactly one field must be set (%d set).\", p, c))\n"
-		contents += "\t}\n"
-	}
-
-	// Use actual struct name so it's consistent between languages
-	contents += fmt.Sprintf("\tif err := oprot.WriteStructBegin(\"%s\"); err != nil {\n", s.Name)
-	contents += "\t\treturn thrift.PrependError(fmt.Sprintf(\"%T write struct begin error: \", p), err)\n"
-	contents += "\t}\n"
-
-	for _, field := range s.Fields {
-		contents += g.generateWriteFieldInline(field)
-	}
-
-	contents += "\tif err := oprot.WriteFieldStop(); err != nil{\n"
-	contents += "\t\treturn thrift.PrependError(\"write field stop error: \", err)\n"
-	contents += "\t}\n"
-	contents += "\tif err := oprot.WriteStructEnd(); err != nil {\n"
-	contents += "\t\treturn thrift.PrependError(\"write struct stop error: \", err)\n"
-	contents += "\t}\n"
-	contents += "\treturn nil\n"
-	contents += "}\n\n"
-
-	for _, field := range s.Fields {
-		contents += g.generateWriteField(sName, field)
-	}
-
-	return contents
-}
-
-func (g *Generator) generateToString(s *parser.Struct, sName string) string {
-	contents := ""
-	// contents += fmt.Sprintf("func (p *%s) String() string {\n", sName)
-	// contents += "\tif p == nil {\n"
-	// contents += "\t\treturn \"<nil>\"\n"
+	// contents := fmt.Sprintf("func (p *%s) Write(oprot thrift.TProtocol) error {\n", sName)
+	//
+	// // Only one field can be set for a union, make sure that's the case
+	// if s.Type == parser.StructTypeUnion {
+	// 	contents += fmt.Sprintf("\tif c := p.CountSetFields%s(); c != 1 {\n", sName)
+	// 	contents += "\t\treturn thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf(\"%T write union: exactly one field must be set (%d set).\", p, c))\n"
+	// 	contents += "\t}\n"
+	// }
+	//
+	// // Use actual struct name so it's consistent between languages
+	// contents += fmt.Sprintf("\tif err := oprot.WriteStructBegin(\"%s\"); err != nil {\n", s.Name)
+	// contents += "\t\treturn thrift.PrependError(fmt.Sprintf(\"%T write struct begin error: \", p), err)\n"
 	// contents += "\t}\n"
-	// contents += fmt.Sprintf("\treturn fmt.Sprintf(\"%s(%%+v)\", *p)\n", sName)
-	// contents += "}\n\n"
-	return contents
-}
-
-func (g *Generator) generateReadField(structName string, field *parser.Field) string {
-	return ""
-	// contents := fmt.Sprintf("func (p *%s) ReadField%d(iprot thrift.TProtocol) error {\n", structName, field.ID)
 	//
-	// contents += g.generateReadFieldRec(field, true)
+	// for _, field := range s.Fields {
+	// 	contents += g.generateWriteFieldInline(field)
+	// }
 	//
+	// contents += "\tif err := oprot.WriteFieldStop(); err != nil{\n"
+	// contents += "\t\treturn thrift.PrependError(\"write field stop error: \", err)\n"
+	// contents += "\t}\n"
+	// contents += "\tif err := oprot.WriteStructEnd(); err != nil {\n"
+	// contents += "\t\treturn thrift.PrependError(\"write struct stop error: \", err)\n"
+	// contents += "\t}\n"
 	// contents += "\treturn nil\n"
 	// contents += "}\n\n"
+	//
+	// for _, field := range s.Fields {
+	// 	contents += g.generateWriteField(sName, field)
+	// }
+	//
 	// return contents
 }
 
@@ -1722,9 +1716,6 @@ func (g *Generator) generateClient(service *parser.Service) string {
 
 	for _, method := range service.Methods {
 		contents += g.generateClientMethod(service, method)
-		if g.generateAsync() {
-			contents += g.generateAsyncClientMethod(service, method)
-		}
 	}
 	return contents
 }
@@ -2379,11 +2370,6 @@ func (g *Generator) qualifiedTypeName(t *parser.Type) string {
 		param += "_"
 	}
 	return param
-}
-
-func (g *Generator) generateAsync() bool {
-	_, ok := g.Options[asyncOption]
-	return ok
 }
 
 func (g *Generator) UseVendor() bool {
