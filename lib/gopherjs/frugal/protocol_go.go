@@ -1,6 +1,6 @@
 // +build !js
 
-package protocol
+package frugal
 
 import (
 	"strings"
@@ -8,22 +8,22 @@ import (
 	"git.apache.org/thrift.git/lib/go/thrift"
 )
 
-func newBuffer(buf []byte) *buffer {
-	return &buffer{
+func newProtocol(buf []byte) *protocol {
+	return &protocol{
 		pro: nil,
 		ctx: make([]string, 0, 10),
 	}
 }
 
-type buffer struct {
+type protocol struct {
 	pro thrift.TProtocol
 	ctx []string
 	err error
 }
 
-func (b *buffer) Set(err error) { b.err = err }
-func (b *buffer) Err() error    { return b.err }
-func (b *buffer) Data() []byte {
+func (b *protocol) Set(err error) { b.err = err }
+func (b *protocol) Err() error    { return b.err }
+func (b *protocol) Data() []byte {
 	return nil
 }
 
@@ -36,10 +36,10 @@ func (ce *contextualizedError) Error() string {
 	return strings.Join(ce.ctx, ".") + ": " + ce.err.Error()
 }
 
-func (b *buffer) push(name string) { b.ctx = append(b.ctx, name) }
-func (b *buffer) pop()             { b.ctx = b.ctx[:len(b.ctx)-2] }
+func (b *protocol) push(name string) { b.ctx = append(b.ctx, name) }
+func (b *protocol) pop()             { b.ctx = b.ctx[:len(b.ctx)-2] }
 
-func (b *buffer) wrap(name string) {
+func (b *protocol) wrap(name string) {
 	switch b.err.(type) {
 	case nil: // no error = noop
 	case *contextualizedError: // already wrapped = noop
@@ -51,7 +51,7 @@ func (b *buffer) wrap(name string) {
 	}
 }
 
-func (b *buffer) WriteMessageBegin(name string, typeID TMessageType, seqID int32) {
+func (b *protocol) WriteMessageBegin(name string, typeID TMessageType, seqID int32) {
 	if b.err == nil {
 		b.push(name)
 		b.err = b.pro.WriteMessageBegin(name, thrift.TMessageType(typeID), seqID)
@@ -59,7 +59,7 @@ func (b *buffer) WriteMessageBegin(name string, typeID TMessageType, seqID int32
 	}
 }
 
-func (b *buffer) WriteMessageEnd() {
+func (b *protocol) WriteMessageEnd() {
 	if b.err == nil {
 		b.err = b.pro.WriteMessageEnd()
 		b.wrap("writeMessageEnd")
@@ -67,7 +67,7 @@ func (b *buffer) WriteMessageEnd() {
 	}
 }
 
-func (b *buffer) WriteStructBegin(name string) {
+func (b *protocol) WriteStructBegin(name string) {
 	if b.err == nil {
 		b.push(name)
 		b.err = b.pro.WriteStructBegin(name)
@@ -75,7 +75,7 @@ func (b *buffer) WriteStructBegin(name string) {
 	}
 }
 
-func (b *buffer) WriteStructEnd() {
+func (b *protocol) WriteStructEnd() {
 	if b.err == nil {
 		b.err = b.pro.WriteStructEnd()
 		b.wrap("writeStructEnd")
@@ -83,7 +83,7 @@ func (b *buffer) WriteStructEnd() {
 	}
 }
 
-func (b *buffer) WriteFieldBegin(name string, typeID TType, id int16) {
+func (b *protocol) WriteFieldBegin(name string, typeID TType, id int16) {
 	if b.err == nil {
 		b.push(name)
 		b.err = b.pro.WriteFieldBegin(name, thrift.TType(typeID), id)
@@ -91,7 +91,7 @@ func (b *buffer) WriteFieldBegin(name string, typeID TType, id int16) {
 	}
 }
 
-func (b *buffer) WriteFieldEnd() {
+func (b *protocol) WriteFieldEnd() {
 	if b.err == nil {
 		b.err = b.pro.WriteFieldEnd()
 		b.wrap("writeFieldEnd")
@@ -99,112 +99,112 @@ func (b *buffer) WriteFieldEnd() {
 	}
 }
 
-func (b *buffer) WriteFieldStop() {
+func (b *protocol) WriteFieldStop() {
 	if b.err == nil {
 		b.err = b.pro.WriteFieldStop()
 		b.wrap("writeFieldStop")
 	}
 }
 
-func (b *buffer) WriteMapBegin(keyType TType, valueType TType, size int) {
+func (b *protocol) WriteMapBegin(keyType TType, valueType TType, size int) {
 	if b.err == nil {
 		b.err = b.pro.WriteMapBegin(thrift.TType(keyType), thrift.TType(valueType), size)
 		b.wrap("writeMapBegin")
 	}
 }
 
-func (b *buffer) WriteMapEnd() {
+func (b *protocol) WriteMapEnd() {
 	if b.err == nil {
 		b.err = b.pro.WriteMapEnd()
 		b.wrap("writeMapEnd")
 	}
 }
 
-func (b *buffer) WriteListBegin(elemType TType, size int) {
+func (b *protocol) WriteListBegin(elemType TType, size int) {
 	if b.err == nil {
 		b.err = b.pro.WriteListBegin(thrift.TType(elemType), size)
 		b.wrap("writeListBegin")
 	}
 }
 
-func (b *buffer) WriteListEnd() {
+func (b *protocol) WriteListEnd() {
 	if b.err == nil {
 		b.err = b.pro.WriteListEnd()
 		b.wrap("writeListEnd")
 	}
 }
 
-func (b *buffer) WriteSetBegin(elemType TType, size int) {
+func (b *protocol) WriteSetBegin(elemType TType, size int) {
 	if b.err == nil {
 		b.err = b.pro.WriteSetBegin(thrift.TType(elemType), size)
 		b.wrap("writeSetBegin")
 	}
 }
 
-func (b *buffer) WriteSetEnd() {
+func (b *protocol) WriteSetEnd() {
 	if b.err == nil {
 		b.err = b.pro.WriteSetEnd()
 		b.wrap("writeSetEnd")
 	}
 }
 
-func (b *buffer) WriteBool(value bool) {
+func (b *protocol) WriteBool(value bool) {
 	if b.err == nil {
 		b.err = b.pro.WriteBool(value)
 		b.wrap("writeBool")
 	}
 }
 
-func (b *buffer) WriteByte(value int8) {
+func (b *protocol) WriteByte(value int8) {
 	if b.err == nil {
 		b.err = b.pro.WriteByte(value)
 		b.wrap("writeByte")
 	}
 }
 
-func (b *buffer) WriteI16(value int16) {
+func (b *protocol) WriteI16(value int16) {
 	if b.err == nil {
 		b.err = b.pro.WriteI16(value)
 		b.wrap("writeI16")
 	}
 }
 
-func (b *buffer) WriteI32(value int32) {
+func (b *protocol) WriteI32(value int32) {
 	if b.err == nil {
 		b.err = b.pro.WriteI32(value)
 		b.wrap("writeI32")
 	}
 }
 
-func (b *buffer) WriteI64(value int64) {
+func (b *protocol) WriteI64(value int64) {
 	if b.err == nil {
 		b.err = b.pro.WriteI64(value)
 		b.wrap("writeI64")
 	}
 }
 
-func (b *buffer) WriteDouble(value float64) {
+func (b *protocol) WriteDouble(value float64) {
 	if b.err == nil {
 		b.err = b.pro.WriteDouble(value)
 		b.wrap("writeDouble")
 	}
 }
 
-func (b *buffer) WriteString(value string) {
+func (b *protocol) WriteString(value string) {
 	if b.err == nil {
 		b.err = b.pro.WriteString(value)
 		b.wrap("writeString")
 	}
 }
 
-func (b *buffer) WriteBinary(value []byte) {
+func (b *protocol) WriteBinary(value []byte) {
 	if b.err == nil {
 		b.err = b.pro.WriteBinary(value)
 		b.wrap("writeBinary")
 	}
 }
 
-func (b *buffer) ReadMessageBegin() (name string, typeID TMessageType, seqID int32) {
+func (b *protocol) ReadMessageBegin() (name string, typeID TMessageType, seqID int32) {
 	if b.err == nil {
 		var typeID2 thrift.TMessageType
 		name, typeID2, seqID, b.err = b.pro.ReadMessageBegin()
@@ -214,28 +214,28 @@ func (b *buffer) ReadMessageBegin() (name string, typeID TMessageType, seqID int
 	return name, typeID, seqID
 }
 
-func (b *buffer) ReadMessageEnd() {
+func (b *protocol) ReadMessageEnd() {
 	if b.err == nil {
 		b.err = b.pro.ReadMessageEnd()
 		b.wrap("readMessageEnd")
 	}
 }
 
-func (b *buffer) ReadStructBegin() {
+func (b *protocol) ReadStructBegin() {
 	if b.err == nil {
 		_, b.err = b.pro.ReadStructBegin()
 		b.wrap("readStructBegin")
 	}
 }
 
-func (b *buffer) ReadStructEnd() {
+func (b *protocol) ReadStructEnd() {
 	if b.err == nil {
 		b.err = b.pro.ReadStructEnd()
 		b.wrap("readStructEnd")
 	}
 }
 
-func (b *buffer) ReadFieldBegin() (typeID TType, id int16) {
+func (b *protocol) ReadFieldBegin() (typeID TType, id int16) {
 	if b.err == nil {
 		var typeID2 thrift.TType
 		_, typeID2, id, b.err = b.pro.ReadFieldBegin()
@@ -245,14 +245,14 @@ func (b *buffer) ReadFieldBegin() (typeID TType, id int16) {
 	return typeID, id
 }
 
-func (b *buffer) ReadFieldEnd() {
+func (b *protocol) ReadFieldEnd() {
 	if b.err == nil {
 		b.err = b.pro.ReadFieldEnd()
 		b.wrap("readFieldEnd")
 	}
 }
 
-func (b *buffer) ReadMapBegin() (size int) {
+func (b *protocol) ReadMapBegin() (size int) {
 	if b.err == nil {
 		_, _, size, b.err = b.pro.ReadMapBegin()
 		b.wrap("readMapBegin")
@@ -260,14 +260,14 @@ func (b *buffer) ReadMapBegin() (size int) {
 	return size
 }
 
-func (b *buffer) ReadMapEnd() {
+func (b *protocol) ReadMapEnd() {
 	if b.err == nil {
 		b.err = b.pro.ReadMapEnd()
 		b.wrap("readMapEnd")
 	}
 }
 
-func (b *buffer) ReadListBegin() (size int) {
+func (b *protocol) ReadListBegin() (size int) {
 	if b.err == nil {
 		_, size, b.err = b.pro.ReadListBegin()
 		b.wrap("readListBegin")
@@ -275,14 +275,14 @@ func (b *buffer) ReadListBegin() (size int) {
 	return size
 }
 
-func (b *buffer) ReadListEnd() {
+func (b *protocol) ReadListEnd() {
 	if b.err == nil {
 		b.err = b.pro.ReadListEnd()
 		b.wrap("readListEnd")
 	}
 }
 
-func (b *buffer) ReadSetBegin() (size int) {
+func (b *protocol) ReadSetBegin() (size int) {
 	if b.err == nil {
 		_, size, b.err = b.pro.ReadSetBegin()
 		b.wrap("readSetBegin")
@@ -290,14 +290,14 @@ func (b *buffer) ReadSetBegin() (size int) {
 	return size
 }
 
-func (b *buffer) ReadSetEnd() {
+func (b *protocol) ReadSetEnd() {
 	if b.err == nil {
 		b.err = b.pro.ReadSetEnd()
 		b.wrap("readSetEnd")
 	}
 }
 
-func (b *buffer) ReadBool() (value bool) {
+func (b *protocol) ReadBool() (value bool) {
 	if b.err == nil {
 		value, b.err = b.pro.ReadBool()
 		b.wrap("readBool")
@@ -305,7 +305,7 @@ func (b *buffer) ReadBool() (value bool) {
 	return value
 }
 
-func (b *buffer) ReadByte() (value int8) {
+func (b *protocol) ReadByte() (value int8) {
 	if b.err == nil {
 		value, b.err = b.pro.ReadByte()
 		b.wrap("readByte")
@@ -313,7 +313,7 @@ func (b *buffer) ReadByte() (value int8) {
 	return value
 }
 
-func (b *buffer) ReadI16() (value int16) {
+func (b *protocol) ReadI16() (value int16) {
 	if b.err == nil {
 		value, b.err = b.pro.ReadI16()
 		b.wrap("readI16")
@@ -321,7 +321,7 @@ func (b *buffer) ReadI16() (value int16) {
 	return value
 }
 
-func (b *buffer) ReadI32() (value int32) {
+func (b *protocol) ReadI32() (value int32) {
 	if b.err == nil {
 		value, b.err = b.pro.ReadI32()
 		b.wrap("readI32")
@@ -329,7 +329,7 @@ func (b *buffer) ReadI32() (value int32) {
 	return value
 }
 
-func (b *buffer) ReadI64() (value int64) {
+func (b *protocol) ReadI64() (value int64) {
 	if b.err == nil {
 		value, b.err = b.pro.ReadI64()
 		b.wrap("readI64")
@@ -337,7 +337,7 @@ func (b *buffer) ReadI64() (value int64) {
 	return value
 }
 
-func (b *buffer) ReadDouble() (value float64) {
+func (b *protocol) ReadDouble() (value float64) {
 	if b.err == nil {
 		value, b.err = b.pro.ReadDouble()
 		b.wrap("readDouble")
@@ -345,7 +345,7 @@ func (b *buffer) ReadDouble() (value float64) {
 	return value
 }
 
-func (b *buffer) ReadString() (value string) {
+func (b *protocol) ReadString() (value string) {
 	if b.err == nil {
 		value, b.err = b.pro.ReadString()
 		b.wrap("readString")
@@ -353,7 +353,7 @@ func (b *buffer) ReadString() (value string) {
 	return value
 }
 
-func (b *buffer) ReadBinary() (value []byte) {
+func (b *protocol) ReadBinary() (value []byte) {
 	if b.err == nil {
 		value, b.err = b.pro.ReadBinary()
 		b.wrap("readBinary")
@@ -361,14 +361,14 @@ func (b *buffer) ReadBinary() (value []byte) {
 	return value
 }
 
-func (b *buffer) Skip(fieldType TType) {
+func (b *protocol) Skip(fieldType TType) {
 	if b.err == nil {
 		b.err = b.pro.Skip(thrift.TType(fieldType))
 		b.wrap("skip")
 	}
 }
 
-func (b *buffer) Flush() {
+func (b *protocol) Flush() {
 	if b.err == nil {
 		b.err = b.pro.Flush()
 		b.wrap("flush")

@@ -1,8 +1,8 @@
-package protocol
+package frugal
 
 // New constructs a new buffer
-func New(base []byte) Buffer {
-	return newBuffer(base)
+func New(base []byte) Protocol {
+	return newProtocol(base)
 }
 
 // TMessageType type constants in the Thrift protocol.
@@ -26,13 +26,11 @@ const (
 	VOID   = 1
 	BOOL   = 2
 	BYTE   = 3
-	I08    = 3
 	DOUBLE = 4
 	I16    = 6
 	I32    = 8
 	I64    = 10
 	STRING = 11
-	UTF7   = 11
 	STRUCT = 12
 	MAP    = 13
 	SET    = 14
@@ -42,8 +40,8 @@ const (
 	BINARY = 18
 )
 
-// Buffer ...
-type Buffer interface {
+// Protocol ...
+type Protocol interface {
 	Set(error)
 	Err() error
 	Data() []byte
