@@ -26,8 +26,11 @@ type protocol struct {
 	err error
 }
 
-func (b *protocol) Set(err error) { b.err = err }
-func (b *protocol) Err() error    { return b.err }
+func (b *protocol) Set(err error) {
+	b.err = err
+	b.wrap("asdf")
+}
+func (b *protocol) Err() error { return b.err }
 func (b *protocol) Data() []byte {
 	return b.buf.Bytes()
 }
@@ -42,7 +45,7 @@ func (ce *contextualizedError) Error() string {
 }
 
 func (b *protocol) Push(name string) { b.ctx = append(b.ctx, name) }
-func (b *protocol) Pop()             { /*b.ctx = b.ctx[:len(b.ctx)-2] */ }
+func (b *protocol) Pop()             { b.ctx = b.ctx[:len(b.ctx)-1] }
 
 func (b *protocol) wrap(name string) {
 	switch b.err.(type) {

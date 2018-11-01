@@ -459,6 +459,19 @@ func (p *{{.Name}}) Unpack(prot frugal.Protocol) {
 
 // Pack serializes {{.Name}} objects.
 func (p *{{.Name}}) Pack(prot frugal.Protocol) {
+	{{if isUnion . -}}
+	// TODO: sanity check for unions
+	count := 0
+	{{range .Fields -}}
+		if p.{{.Name}} != nil {
+			count++
+		}
+	{{end -}}
+	if count != 1 {
+		prot.Set(errors.New("{{.Name}} invalid union state"))
+		return
+	}
+	{{end -}}
   prot.PackStructBegin("{{.Name}}")
 	{{range .Fields}}{{packField .}}{{end -}}
   prot.PackStructEnd()
@@ -482,6 +495,9 @@ func (g *Generator) generateStruct(s *parser.Struct, serviceName string) string 
 		},
 		"packField": func(field *parser.Field) string {
 			return g.generateWriteFieldRec(field, "p.")
+		},
+		"isUnion": func(s *parser.Struct) bool {
+			return s.Type == parser.StructTypeUnion
 		},
 	}
 	var readTemplate = template.Must(template.New("read").Funcs(funcMap).Parse(structTemplate))
@@ -620,25 +636,6 @@ func (g *Generator) generateGetters(s *parser.Struct, sName string) string {
 	// 	// }
 	// }
 	// return contents
-}
-
-// generateCountSetFields generates a helper function to determine how many
-// optional fields are set in a union.
-func (g *Generator) generateCountSetFields(s *parser.Struct, sName string) string {
-	contents := ""
-
-	// if s.Type == parser.StructTypeUnion {
-	// 	contents += fmt.Sprintf("func (p *%s) CountSetFields%s() int {\n", sName, sName)
-	// 	contents += "\tcount := 0\n"
-	// 	for _, field := range s.Fields {
-	// 		contents += fmt.Sprintf("\tif p.IsSet%s() {\n", title(field.Name))
-	// 		contents += "\t\tcount++\n"
-	// 		contents += "\t}\n"
-	// 	}
-	// 	contents += "\treturn count\n"
-	// 	contents += "}\n\n"
-	// }
-	return contents
 }
 
 func (g *Generator) generateWrite(s *parser.Struct, sName string) string {
