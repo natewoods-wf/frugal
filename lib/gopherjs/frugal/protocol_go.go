@@ -9,13 +9,18 @@ import (
 )
 
 func newProtocol(buf []byte) *protocol {
+	pf := thrift.NewTCompactProtocolFactory()
+	trans := thrift.NewTMemoryBuffer()
+	trans.Write(buf)
 	return &protocol{
-		pro: nil,
+		buf: trans,
+		pro: pf.GetProtocol(trans),
 		ctx: make([]string, 0, 10),
 	}
 }
 
 type protocol struct {
+	buf *thrift.TMemoryBuffer
 	pro thrift.TProtocol
 	ctx []string
 	err error
@@ -24,7 +29,7 @@ type protocol struct {
 func (b *protocol) Set(err error) { b.err = err }
 func (b *protocol) Err() error    { return b.err }
 func (b *protocol) Data() []byte {
-	return nil
+	return b.buf.Bytes()
 }
 
 type contextualizedError struct {
@@ -37,7 +42,7 @@ func (ce *contextualizedError) Error() string {
 }
 
 func (b *protocol) Push(name string) { b.ctx = append(b.ctx, name) }
-func (b *protocol) Pop()             { b.ctx = b.ctx[:len(b.ctx)-2] }
+func (b *protocol) Pop()             { /*b.ctx = b.ctx[:len(b.ctx)-2] */ }
 
 func (b *protocol) wrap(name string) {
 	switch b.err.(type) {
@@ -84,6 +89,9 @@ func (b *protocol) PackStructEnd() {
 }
 
 func (b *protocol) PackFieldBegin(name string, typeID TType, id int16) {
+	if id < 0 {
+		return
+	}
 	if b.err == nil {
 		b.Push(name)
 		b.err = b.pro.WriteFieldBegin(name, thrift.TType(typeID), id)
@@ -91,7 +99,10 @@ func (b *protocol) PackFieldBegin(name string, typeID TType, id int16) {
 	}
 }
 
-func (b *protocol) PackFieldEnd() {
+func (b *protocol) PackFieldEnd(id int16) {
+	if id < 0 {
+		return
+	}
 	if b.err == nil {
 		b.err = b.pro.WriteFieldEnd()
 		b.wrap("writeFieldEnd")
@@ -106,102 +117,124 @@ func (b *protocol) PackFieldStop() {
 	}
 }
 
-func (b *protocol) PackMapBegin(keyType TType, valueType TType, size int) {
+func (b *protocol) PackMapBegin(name string, id int16, keyType TType, valueType TType, size int) {
+	b.PackFieldBegin(name, MAP, id)
 	if b.err == nil {
 		b.err = b.pro.WriteMapBegin(thrift.TType(keyType), thrift.TType(valueType), size)
 		b.wrap("writeMapBegin")
 	}
 }
 
-func (b *protocol) PackMapEnd() {
+func (b *protocol) PackMapEnd(id int16) {
 	if b.err == nil {
 		b.err = b.pro.WriteMapEnd()
 		b.wrap("writeMapEnd")
 	}
+	b.PackFieldEnd(id)
 }
 
-func (b *protocol) PackListBegin(elemType TType, size int) {
+func (b *protocol) PackListBegin(name string, id int16, elemType TType, size int) {
+	b.PackFieldBegin(name, LIST, id)
 	if b.err == nil {
 		b.err = b.pro.WriteListBegin(thrift.TType(elemType), size)
 		b.wrap("writeListBegin")
 	}
 }
 
-func (b *protocol) PackListEnd() {
+func (b *protocol) PackListEnd(id int16) {
 	if b.err == nil {
 		b.err = b.pro.WriteListEnd()
 		b.wrap("writeListEnd")
 	}
+	b.PackFieldEnd(id)
 }
 
-func (b *protocol) PackSetBegin(elemType TType, size int) {
+func (b *protocol) PackSetBegin(name string, id int16, elemType TType, size int) {
+	b.PackFieldBegin(name, SET, id)
 	if b.err == nil {
 		b.err = b.pro.WriteSetBegin(thrift.TType(elemType), size)
 		b.wrap("writeSetBegin")
 	}
 }
 
-func (b *protocol) PackSetEnd() {
+func (b *protocol) PackSetEnd(id int16) {
 	if b.err == nil {
 		b.err = b.pro.WriteSetEnd()
 		b.wrap("writeSetEnd")
 	}
+	b.PackFieldEnd(id)
 }
 
-func (b *protocol) PackBool(value bool) {
+func (b *protocol) PackBool(name string, id int16, value bool) {
+	b.PackFieldBegin(name, BOOL, id)
 	if b.err == nil {
 		b.err = b.pro.WriteBool(value)
 		b.wrap("writeBool")
 	}
+	b.PackFieldEnd(id)
 }
 
-func (b *protocol) PackByte(value int8) {
+func (b *protocol) PackByte(name string, id int16, value int8) {
+	b.PackFieldBegin(name, BYTE, id)
 	if b.err == nil {
 		b.err = b.pro.WriteByte(value)
 		b.wrap("writeByte")
 	}
+	b.PackFieldEnd(id)
 }
 
-func (b *protocol) PackI16(value int16) {
+func (b *protocol) PackI16(name string, id int16, value int16) {
+	b.PackFieldBegin(name, I16, id)
 	if b.err == nil {
 		b.err = b.pro.WriteI16(value)
 		b.wrap("writeI16")
 	}
+	b.PackFieldEnd(id)
 }
 
-func (b *protocol) PackI32(value int32) {
+func (b *protocol) PackI32(name string, id int16, value int32) {
+	b.PackFieldBegin(name, I32, id)
 	if b.err == nil {
 		b.err = b.pro.WriteI32(value)
 		b.wrap("writeI32")
 	}
+	b.PackFieldEnd(id)
 }
 
-func (b *protocol) PackI64(value int64) {
+func (b *protocol) PackI64(name string, id int16, value int64) {
+	b.PackFieldBegin(name, I64, id)
 	if b.err == nil {
 		b.err = b.pro.WriteI64(value)
 		b.wrap("writeI64")
 	}
+	b.PackFieldEnd(id)
 }
 
-func (b *protocol) PackDouble(value float64) {
+func (b *protocol) PackDouble(name string, id int16, value float64) {
+	b.PackFieldBegin(name, DOUBLE, id)
 	if b.err == nil {
 		b.err = b.pro.WriteDouble(value)
 		b.wrap("writeDouble")
 	}
+	b.PackFieldEnd(id)
 }
 
-func (b *protocol) PackString(value string) {
+func (b *protocol) PackString(name string, id int16, value string) {
+	b.PackFieldBegin(name, STRING, id)
 	if b.err == nil {
 		b.err = b.pro.WriteString(value)
 		b.wrap("writeString")
 	}
+	b.PackFieldEnd(id)
 }
 
-func (b *protocol) PackBinary(value []byte) {
+func (b *protocol) PackBinary(name string, id int16, value []byte) {
+	b.PackFieldBegin(name, BINARY, id)
 	if b.err == nil {
 		b.err = b.pro.WriteBinary(value)
 		b.wrap("writeBinary")
 	}
+	b.PackFieldEnd(id)
 }
 
 func (b *protocol) UnpackMessageBegin() (name string, typeID TMessageType, seqID int32) {

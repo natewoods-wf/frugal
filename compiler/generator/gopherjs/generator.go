@@ -32,8 +32,8 @@ import (
 )
 
 const (
-	lang                = "gopherjs"
-	defaultOutputDir    = "gen-gopherjs"
+	lang                = "go"
+	defaultOutputDir    = "gen-go"
 	serviceSuffix       = "_service"
 	scopeSuffix         = "_scope"
 	packagePrefixOption = "package_prefix"
@@ -460,17 +460,12 @@ func (p *{{.Name}}) Unpack(prot frugal.Protocol) {
 // Pack serializes {{.Name}} objects.
 func (p *{{.Name}}) Pack(prot frugal.Protocol) {
   prot.PackStructBegin("{{.Name}}")
-	{{range .Fields -}}
-	{{packField .}}
-	{{end -}}
+	{{range .Fields}}{{packField .}}{{end -}}
   prot.PackStructEnd()
 }
 `
 
 func (g *Generator) generateStruct(s *parser.Struct, serviceName string) string {
-	// contents += g.generateGetters(s, sName)
-	// contents += g.generateCountSetFields(s, sName)
-	// contents += g.generateWrite(s, sName)
 
 	// Fix the names of fields
 	for _, field := range s.Fields {
@@ -486,7 +481,7 @@ func (g *Generator) generateStruct(s *parser.Struct, serviceName string) string 
 			return g.getGoTypeFromThriftTypePtr(field.Type, g.isPointerField(field))
 		},
 		"packField": func(field *parser.Field) string {
-			return "// TODO: pack " + field.Name
+			return g.generateWriteFieldRec(field, "p.")
 		},
 	}
 	var readTemplate = template.Must(template.New("read").Funcs(funcMap).Parse(structTemplate))
@@ -646,80 +641,6 @@ func (g *Generator) generateCountSetFields(s *parser.Struct, sName string) strin
 	return contents
 }
 
-func (g *Generator) generateRead(s *parser.Struct, sName string) string {
-	contents := ""
-
-	// contents += fmt.Sprintf("func (p *%s) Read(iprot thrift.TProtocol) error {\n", sName)
-	// contents += "\tif _, err := iprot.ReadStructBegin(); err != nil {\n"
-	// contents += "\t\treturn thrift.PrependError(fmt.Sprintf(\"%T read error: \", p), err)\n"
-	// contents += "\t}\n\n"
-	// for _, field := range s.Fields {
-	// 	// Generate variables to make sure required fields are present
-	// 	if field.Modifier == parser.Required {
-	// 		contents += fmt.Sprintf("\tisset%s := false\n", title(field.Name))
-	// 	}
-	// }
-	// contents += "\n"
-	// contents += "\tfor {\n"
-	// contents += "\t\t_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin()\n"
-	// contents += "\t\tif err != nil {\n"
-	// contents += "\t\t\treturn thrift.PrependError(fmt.Sprintf(\"%T field %d read error: \", p, fieldId), err)\n"
-	// contents += "\t\t}\n"
-	// contents += "\t\tif fieldTypeId == thrift.STOP {\n"
-	// contents += "\t\t\tbreak\n"
-	// contents += "\t\t}\n"
-	// if len(s.Fields) > 0 {
-	// 	contents += "\t\tswitch fieldId {\n"
-	// 	for _, field := range s.Fields {
-	// 		contents += fmt.Sprintf("\t\tcase %d:\n", field.ID)
-	// 		contents += g.generateReadFieldRec(field, true)
-	// 		if field.Modifier == parser.Required {
-	// 			contents += fmt.Sprintf("\t\t\tisset%s = true\n", title(field.Name))
-	// 		}
-	// 	}
-	// 	contents += "\t\tdefault:\n"
-	// }
-	// contents += "\t\t\tif err := iprot.Skip(fieldTypeId); err != nil {\n"
-	// contents += "\t\t\t\treturn err\n"
-	// contents += "\t\t\t}\n"
-	// if len(s.Fields) > 0 {
-	// 	contents += "\t\t}\n"
-	// }
-	// contents += "\t\tif err := iprot.ReadFieldEnd(); err != nil {\n"
-	// contents += "\t\t\treturn err\n"
-	// contents += "\t\t}\n"
-	// contents += "\t}\n"
-	// contents += "\tif err := iprot.ReadStructEnd(); err != nil {\n"
-	// contents += "\t\treturn thrift.PrependError(fmt.Sprintf(\"%T read struct end error: \", p), err)\n"
-	// contents += "\t}\n"
-	// for _, field := range s.Fields {
-	// 	if field.Modifier == parser.Required {
-	// 		fName := title(field.Name)
-	// 		contents += fmt.Sprintf("\tif !isset%s {\n", fName)
-	// 		errorMessage := fmt.Sprintf("Required field '%s' is not present in struct '%s'", fName, s.Name)
-	// 		contents += fmt.Sprintf("\t\treturn thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf(\"%s\"))\n", errorMessage)
-	// 		contents += "\t}\n"
-	// 	}
-	// }
-	//
-	// // Only one field can be set for a union, make sure that's the case
-	// if s.Type == parser.StructTypeUnion {
-	// 	contents += fmt.Sprintf("\tif c := p.CountSetFields%s(); c != 1 {\n", sName)
-	// 	contents += "\t\treturn thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf(\"%T read union: exactly one field must be set (%d set).\", p, c))\n"
-	// 	contents += "\t}\n"
-	// }
-	//
-	// contents += "\treturn nil\n"
-	// contents += "}\n\n"
-
-	// if !g.generateSlim() {
-	// 	for _, field := range s.Fields {
-	// 		contents += g.generateReadField(sName, field)
-	// 	}
-	// }
-	return contents
-}
-
 func (g *Generator) generateWrite(s *parser.Struct, sName string) string {
 	return ""
 	// contents := fmt.Sprintf("func (p *%s) Write(oprot thrift.TProtocol) error {\n", sName)
@@ -778,10 +699,6 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string
 
 	isEnum := g.Frugal.IsEnum(underlyingType)
 	if underlyingType.IsPrimitive() || isEnum {
-		// if !first {
-		// 	contents += fmt.Sprintf("\tvar %s%s %s\n", prefix, field.Name, goOrigType)
-		// }
-
 		thriftType := ""
 		switch underlyingType.Name {
 		case "bool":
@@ -848,16 +765,10 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string
 		}
 		// TODO 2.0 use this to get the value reading code, respecting the type,
 		// instead of the current code for list and set
-		//valElem := getElem()
-		//valField := parser.FieldFromType(underlyingType.ValueType, valElem)
-		//valContents := g.generateReadFieldRec(valField, false)
 		switch underlyingType.Name {
 		case "list":
 			contents += "\tsize := prot.UnpackListBegin()\n"
-			// contents += "\t_, size, err := prot.ReadListBegin()\n"
-			// contents += "\tif err != nil {\n"
-			// contents += "\t\treturn thrift.PrependError(\"error reading list begin: \", err)\n"
-			// contents += "\t}\n"
+			contents += "\tif size > 0 {"
 			if !isPointerField {
 				contents += fmt.Sprintf("\t%s%s %s make(%s, size)\n", prefix, fName, eq, goOrigType)
 			} else {
@@ -869,35 +780,12 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string
 			valField := parser.FieldFromType(underlyingType.ValueType, valElem)
 			valField.Name = fmt.Sprintf("(%s%s%s)[i]", maybePointer, prefix, fName)
 			contents += g.generateReadFieldRec(valField, false)
-			// contents += fmt.Sprintf("\t\t%s%s%s = append(%s%s%s, %s)\n", maybePointer, prefix, fName, maybePointer, prefix, fName, valElem)
-			contents += "\t}\n"
+			contents += "\t}\n\t}\n"
 			contents += "\tprot.UnpackListEnd()\n"
 		case "set":
-			contents += "\t_, size, err := prot.ReadSetBegin()\n"
-			contents += "\tif err != nil {\n"
-			contents += "\t\treturn thrift.PrependError(\"error reading set begin: \", err)\n"
-			contents += "\t}\n"
-			if !isPointerField {
-				contents += fmt.Sprintf("\t%s%s %s make(%s, size)\n", prefix, fName, eq, goOrigType)
-			} else {
-				contents += fmt.Sprintf("\ttemp := make(%s, size)\n", goOrigType)
-				contents += fmt.Sprintf("\t%s%s %s &temp\n", prefix, fName, eq)
-			}
-			contents += "\tfor i := 0; i < size; i++ {\n"
-			valElem := g.GetElem()
-			valField := parser.FieldFromType(underlyingType.ValueType, valElem)
-			valContents := g.generateReadFieldRec(valField, false)
-			contents += valContents
-			contents += fmt.Sprintf("\t\t(%s%s%s)[%s] = true\n", maybePointer, prefix, fName, valElem)
-			contents += "\t}\n"
-			contents += "\tif err := iprot.ReadSetEnd(); err != nil {\n"
-			contents += "\t\treturn thrift.PrependError(\"error reading set end: \", err)\n"
-			contents += "\t}\n"
+			panic("sets not supported yet")
 		case "map":
 			contents += "\tsize := prot.UnpackMapBegin()\n"
-			// contents += "\tif err != nil {\n"
-			// contents += "\t\treturn thrift.PrependError(\"error reading map begin: \", err)\n"
-			// contents += "\t}\n"
 			if !isPointerField {
 				contents += fmt.Sprintf("\t%s%s %s make(%s, size)\n", prefix, fName, eq, goOrigType)
 			} else {
@@ -915,98 +803,10 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string
 			contents += fmt.Sprintf("\t\t(%s%s%s)[%s] = %s\n", maybePointer, prefix, fName, keyElem, valElem)
 			contents += "\t}\n"
 			contents += "\tprot.UnpackMapEnd()\n"
-			// contents += "\t\treturn thrift.PrependError(\"error reading map end: \", err)\n"
-			// contents += "\t}\n"
 		default:
 			panic("unrecognized thrift type: " + underlyingType.Name)
 		}
 	}
-	return contents
-}
-
-func (g *Generator) skipStandaloneFieldHandler(field *parser.Field) bool {
-	// return false
-	// // if !g.generateSlim() {
-	// // 	return false
-	// // }
-	baseType := g.Frugal.UnderlyingType(field.Type)
-	isStruct := g.Frugal.IsStruct(baseType)
-	return baseType.IsPrimitive() || isStruct || g.Frugal.IsEnum(baseType)
-}
-
-func (g *Generator) generateWriteFieldInline(field *parser.Field) (contents string) {
-	return ""
-	if !g.skipStandaloneFieldHandler(field) {
-		return fmt.Sprintf("\tif err := p.writeField%d(oprot); err != nil {\n\t\treturn err\n\t}\n", field.ID)
-	}
-
-	// Check if this field is optional and add nil checks if we need them.
-	var indent string
-	var tail string
-	if field.Modifier == parser.Optional {
-		indent = "\t"
-		tail = "\t\t}\n"
-		contents += fmt.Sprintf("\tif p.IsSet%s() {\n", snakeToCamel(field.Name))
-	}
-
-	// Get the write function we need to invoke
-	baseType := g.Frugal.UnderlyingType(field.Type)
-	writeMethod := snakeToCamel(baseType.Name)
-	if g.Frugal.IsStruct(baseType) {
-		writeMethod = "Struct"
-	} else if g.Frugal.IsEnum(baseType) {
-		writeMethod = "I32"
-	}
-
-	// Get appropriate way to reference struct field
-	structField := "p." + snakeToCamel(field.Name)
-
-	// The Thrift generator uses a convention of appending a suffix of '_'
-	// if the argument starts with 'New', ends with 'Result' or ends with 'Args'.
-	// This effort must be duplicated to correctly reference Thrift generated code.
-	if strings.HasPrefix(structField, "New") || strings.HasSuffix(structField, "Result") || strings.HasSuffix(structField, "Args") {
-		structField += "_"
-	}
-
-	if g.isPointerField(field) && !g.Frugal.IsStruct(baseType) { // don't dereference structs
-		structField = "*" + structField
-	}
-	if g.Frugal.IsEnum(baseType) || (g.isPrimitive(baseType) && !field.Type.IsPrimitive()) {
-		structField = g.getGoTypeFromThriftTypeEnum(baseType) + "(" + structField + ")" // add type casts
-	}
-
-	// Actually generate the write block
-	contents += indent + fmt.Sprintf("\tif err := frugal.Write%s(oprot, %s, \"%s\", %d); err != nil {\n", writeMethod, structField, field.Name, field.ID)
-	contents += indent + fmt.Sprintf("\t\treturn thrift.PrependError(fmt.Sprintf(\"%%T::%s:%d \", p), err)", field.Name, field.ID)
-	return contents + tail + "\t}\n"
-}
-
-func (g *Generator) generateWriteField(structName string, field *parser.Field) string {
-	return ""
-	if g.skipStandaloneFieldHandler(field) {
-		return ""
-	}
-	contents := ""
-	fName := title(field.Name)
-
-	contents += fmt.Sprintf("func (p *%s) writeField%d(oprot thrift.TProtocol) error {\n", structName, field.ID)
-	// If an optional field isn't set, it isn't written
-	if field.Modifier == parser.Optional {
-		contents += fmt.Sprintf("\tif p.IsSet%s() {\n", fName)
-	}
-	// Use actual field so it's consistent between languages
-	contents += fmt.Sprintf("\tif err := oprot.WriteFieldBegin(\"%s\", %s, %d); err != nil {\n", field.Name, g.getEnumFromThriftType(field.Type), field.ID)
-	contents += fmt.Sprintf("\t\treturn thrift.PrependError(fmt.Sprintf(\"%%T write field begin error %d:%s: \", p), err)\n", field.ID, field.Name)
-	contents += "\t}\n"
-	contents += g.generateWriteFieldRec(field, "p.")
-	contents += "\tif err := oprot.WriteFieldEnd(); err != nil {\n"
-	contents += fmt.Sprintf("\t\treturn thrift.PrependError(fmt.Sprintf(\"%%T write field end error %d:%s: \", p), err)\n", field.ID, field.Name)
-	contents += "\t}\n"
-	if field.Modifier == parser.Optional {
-		contents += "\t}\n"
-	}
-	contents += "\treturn nil\n"
-	contents += "}\n\n"
 	return contents
 }
 
@@ -1016,134 +816,104 @@ func (g *Generator) generateWriteFieldRec(field *parser.Field, prefix string) st
 	fName := title(field.Name)
 	contents := ""
 
+	var trailer string
+	if field.Modifier == parser.Optional {
+		trailer = "\t}\n"
+		contents += "if " + prefix + fName + " != nil {\n"
+	}
+
 	isEnum := g.Frugal.IsEnum(underlyingType)
 	if underlyingType.IsPrimitive() || isEnum {
 		if isPointerField {
 			prefix = "*" + prefix
 		}
 
-		write := "Write"
+		write := "Pack"
 		switch underlyingType.Name {
 		// Just typecast everything to get around typedefs
 		case "bool":
-			write += "Bool(bool(%s))"
+			write += "Bool(%q, %d, bool(%s))"
 		case "byte", "i8":
-			write += "Byte(int8(%s))"
+			write += "Byte(%q, %d, int8(%s))"
 		case "i16":
-			write += "I16(int16(%s))"
+			write += "I16(%q, %d, int16(%s))"
 		case "i32":
-			write += "I32(int32(%s))"
+			write += "I32(%q, %d, int32(%s))"
 		case "i64":
-			write += "I64(int64(%s))"
+			write += "I64(%q, %d, int64(%s))"
 		case "double":
-			write += "Double(float64(%s))"
+			write += "Double(%q, %d, float64(%s))"
 		case "string":
-			write += "String(string(%s))"
+			write += "String(%q, %d, string(%s))"
 		case "binary":
-			write += "Binary([]byte(%s))"
+			write += "Binary(%q, %d, []byte(%s))"
 		default:
 			if isEnum {
-				write += "I32(int32(%s))"
+				write += "I32(%q, %d, int32(%s))"
 			} else {
 				panic("unknown thrift type: " + underlyingType.Name)
 			}
 		}
-		write = fmt.Sprintf(write, prefix+fName)
-		contents += fmt.Sprintf("\tif err := oprot.%s; err != nil {\n", write)
-		contents += fmt.Sprintf("\t\treturn thrift.PrependError(fmt.Sprintf(\"%%T.%s (%d) field write error: \", p), err)\n", field.Name, field.ID)
-		contents += "\t}\n"
+		write = fmt.Sprintf(write, field.Name, field.ID, prefix+fName)
+		contents += fmt.Sprintf("\tprot.%s\n", write)
 	} else if g.Frugal.IsStruct(underlyingType) {
-		contents += fmt.Sprintf("\tif err := %s.Write(oprot); err != nil {\n", prefix+fName)
-		contents += fmt.Sprintf("\t\treturn thrift.PrependError(fmt.Sprintf(\"%%T error writing struct: \", %s), err)\n", prefix+fName)
-		contents += "\t}\n"
+		contents += fmt.Sprintf("\tprot.PackFieldBegin(%q, frugal.STRUCT, %d)\n", field.Name, field.ID)
+		contents += fmt.Sprintf("\t%s.Pack(prot)\n", prefix+fName)
+		contents += fmt.Sprintf("\tprot.PackFieldEnd(%d)\n", field.ID)
 	} else if underlyingType.IsContainer() {
 		if isPointerField {
 			prefix = "*" + prefix
 		}
 		valEnumType := g.getEnumFromThriftType(underlyingType.ValueType)
 		valField := parser.FieldFromType(underlyingType.ValueType, "")
+		valField.ID = -1
 
 		switch underlyingType.Name {
 		case "list":
-			contents += fmt.Sprintf("\tif err := oprot.WriteListBegin(%s, len(%s)); err != nil {\n", valEnumType, prefix+fName)
-			contents += "\t\treturn thrift.PrependError(\"error writing list begin: \", err)\n"
-			contents += "\t}\n"
+			contents += fmt.Sprintf("\tprot.PackListBegin(%q, %d, %s, len(%s))\n", field.Name, field.ID, valEnumType, prefix+fName)
 			contents += fmt.Sprintf("\tfor _, v := range %s {\n", prefix+fName)
 			contents += g.generateWriteFieldRec(valField, "v")
 			contents += "\t}\n"
-			contents += "\tif err := oprot.WriteListEnd(); err != nil {\n"
-			contents += "\t\treturn thrift.PrependError(\"error writing list end: \", err)\n"
-			contents += "\t}\n"
+			contents += fmt.Sprintf("\tprot.PackListEnd(%d)\n", field.ID)
 		case "set":
-			contents += fmt.Sprintf("\tif err := oprot.WriteSetBegin(%s, len(%s)); err != nil {\n", valEnumType, prefix+fName)
-			contents += "\t\treturn thrift.PrependError(\"error writing set begin: \", err)\n"
-			contents += "\t}\n"
-			contents += fmt.Sprintf("\tfor v, _ := range %s {\n", prefix+fName)
-			contents += g.generateWriteFieldRec(valField, "v")
-			contents += "\t}\n"
-			contents += "\tif err := oprot.WriteSetEnd(); err != nil {\n"
-			contents += "\t\treturn thrift.PrependError(\"error writing set end: \", err)\n"
-			contents += "\t}\n"
+			panic("sets not implemented")
 		case "map":
 			keyEnumType := g.getEnumFromThriftType(underlyingType.KeyType)
-			contents += fmt.Sprintf("\tif err := oprot.WriteMapBegin(%s, %s, len(%s)); err != nil {\n", keyEnumType, valEnumType, prefix+fName)
-			contents += "\t\treturn thrift.PrependError(\"error writing map begin: \", err)\n"
-			contents += "\t}\n"
+			contents += fmt.Sprintf("\tprot.PackMapBegin(%q, %d, %s, %s, len(%s))\n", field.Name, field.ID, keyEnumType, valEnumType, prefix+fName)
 			contents += fmt.Sprintf("\tfor k, v := range %s {\n", prefix+fName)
 			keyField := parser.FieldFromType(underlyingType.KeyType, "")
+			keyField.ID = -1
 			contents += g.generateWriteFieldRec(keyField, "k")
 			contents += g.generateWriteFieldRec(valField, "v")
 			contents += "\t}\n"
-			contents += "\tif err := oprot.WriteMapEnd(); err != nil {\n"
-			contents += "\t\treturn thrift.PrependError(\"error writing map end: \", err)\n"
-			contents += "\t}\n"
+			contents += fmt.Sprintf("\tprot.PackMapEnd(%d)\n", field.ID)
 		default:
 			panic("unknow type: " + underlyingType.Name)
 		}
 	}
 
-	return contents
+	return contents + trailer
 }
 
 // GenerateTypesImports generates the necessary Go types imports.
 func (g *Generator) GenerateTypesImports(file *os.File) error {
 	contents := "import (\n"
-	contents += "\t\"bytes\"\n"
-	contents += "\t\"fmt\"\n"
-	// Enums need these for some reason
-	if len(g.Frugal.Enums) > 0 {
-		contents += "\t\"database/sql/driver\"\n"
-		contents += "\t\"errors\"\n"
-	}
-	if g.Options[thriftImportOption] != "" {
-		contents += "\t\"" + g.Options[thriftImportOption] + "\"\n"
-	} else {
-		contents += "\t\"git.apache.org/thrift.git/lib/go/thrift\"\n"
-	}
 	if g.Options[frugalImportOption] != "" {
 		contents += "\t\"" + g.Options[frugalImportOption] + "\"\n"
 	} else {
 		contents += "\t\"github.com/Workiva/frugal/lib/gopherjs/frugal\"\n"
 	}
 
-	protections := ""
 	pkgPrefix := g.Options[packagePrefixOption]
 	for _, include := range g.Frugal.Includes {
-		if imp, err := g.generateIncludeImport(include, pkgPrefix); err != nil {
+		imp, err := g.generateIncludeImport(include, pkgPrefix)
+		if err != nil {
 			return err
-		} else {
-			contents += imp
 		}
-		protections += g.generateImportProtection(include)
+		contents += imp
 	}
 
 	contents += ")\n\n"
-	// contents += "// (needed to ensure safety because of naive import list construction.)\n"
-	// contents += "var _ = thrift.ZERO\n"
-	// contents += "var _ = fmt.Printf\n"
-	// contents += "var _ = bytes.Equal\n\n"
-	contents += protections
-	contents += "var GoUnusedProtection__ int\n"
 	_, err := file.WriteString(contents)
 	return err
 }
@@ -1155,13 +925,7 @@ func (g *Generator) GenerateServiceResultArgsImports(file *os.File) error {
 	contents += "import (\n"
 	contents += "\t\"bytes\"\n"
 	contents += "\t\"fmt\"\n"
-	if g.Options[thriftImportOption] != "" {
-		contents += "\t\"" + g.Options[thriftImportOption] + "\"\n"
-	} else {
-		contents += "\t\"git.apache.org/thrift.git/lib/go/thrift\"\n"
-	}
 
-	protections := ""
 	pkgPrefix := g.Options[packagePrefixOption]
 	for _, include := range g.Frugal.Includes {
 		if imp, err := g.generateIncludeImport(include, pkgPrefix); err != nil {
@@ -1169,7 +933,6 @@ func (g *Generator) GenerateServiceResultArgsImports(file *os.File) error {
 		} else {
 			contents += imp
 		}
-		protections += g.generateImportProtection(include)
 	}
 
 	contents += ")\n\n"
@@ -1177,7 +940,6 @@ func (g *Generator) GenerateServiceResultArgsImports(file *os.File) error {
 	contents += "var _ = thrift.ZERO\n"
 	contents += "var _ = fmt.Printf\n"
 	contents += "var _ = bytes.Equal\n\n"
-	contents += protections
 
 	_, err := file.WriteString(contents)
 	return err
@@ -1292,16 +1054,6 @@ func (g *Generator) generateIncludeImport(include *parser.Include, pkgPrefix str
 	}
 
 	return fmt.Sprintf("\t\"%s\"\n", importPath), nil
-}
-
-func (g *Generator) generateImportProtection(include *parser.Include) string {
-	includeName := filepath.Base(include.Name)
-	namespace := g.Frugal.NamespaceForInclude(includeName, lang)
-	if namespace != nil {
-		includeName = namespace.Value
-	}
-	return fmt.Sprintf("var _ = %s.GoUnusedProtection__\n",
-		includeNameToReference(includeName))
 }
 
 // GenerateConstants generates any static constants.
@@ -2279,30 +2031,30 @@ func (g *Generator) getEnumFromThriftType(t *parser.Type) string {
 	underlyingType := g.Frugal.UnderlyingType(t)
 	switch underlyingType.Name {
 	case "bool":
-		return "thrift.BOOL"
+		return "frugal.BOOL"
 	case "byte", "i8":
-		return "thrift.BYTE"
+		return "frugal.BYTE"
 	case "i16":
-		return "thrift.I16"
+		return "frugal.I16"
 	case "i32":
-		return "thrift.I32"
+		return "frugal.I32"
 	case "i64":
-		return "thrift.I64"
+		return "frugal.I64"
 	case "double":
-		return "thrift.DOUBLE"
+		return "frugal.DOUBLE"
 	case "string", "binary":
-		return "thrift.STRING"
+		return "frugal.STRING"
 	case "list":
-		return "thrift.LIST"
+		return "frugal.LIST"
 	case "set":
-		return "thrift.SET"
+		return "frugal.SET"
 	case "map":
-		return "thrift.MAP"
+		return "frugal.MAP"
 	default:
 		if g.Frugal.IsEnum(underlyingType) {
-			return "thrift.I32"
+			return "frugal.I32"
 		} else if g.Frugal.IsStruct(underlyingType) {
-			return "thrift.STRUCT"
+			return "frugal.STRUCT"
 		}
 		panic("not a valid thrift type: " + underlyingType.Name)
 	}
@@ -2436,19 +2188,6 @@ func titleServiceName(name string, serviceName string) string {
 	}
 
 	return result
-}
-
-// startsWithInitialism returns the initialism if the given string begins with
-// it.
-func startsWithInitialism(s string) string {
-	var initialism string
-	// the longest initialism is 5 char, the shortest 2
-	for i := 1; i <= 5; i++ {
-		if len(s) > i-1 && commonInitialisms[s[:i]] {
-			initialism = s[:i]
-		}
-	}
-	return initialism
 }
 
 // commonInitialisms, taken from
