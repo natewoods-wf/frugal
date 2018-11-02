@@ -919,8 +919,7 @@ func (g *Generator) GenerateTypesImports(file *os.File) error {
 // GenerateServiceResultArgsImports generates the necessary imports for service
 // args and result types.
 func (g *Generator) GenerateServiceResultArgsImports(file *os.File) error {
-	contents := ""
-	contents += "import (\n"
+	contents := "import (\n"
 
 	pkgPrefix := g.Options[packagePrefixOption]
 	for _, include := range g.Frugal.Includes {
@@ -1324,16 +1323,63 @@ func (g *Generator) generateSubscribeMethod(scope *parser.Scope, op *parser.Oper
 	return subscriber
 }
 
+const serviceTemplate = `
+// {{.Name}} is a service or a client.
+type {{.Name}} interface {
+	{{range .Methods -}}
+	{{.Name}}(ctx frugal.Context, args ...interface{}) (res []interface{}, err error)
+	{{end -}}
+}
+
+// {{.Name}}Client is the client.
+type {{.Name}}Client struct {
+	core frugal.CallFunc
+}
+
+// New{{.Name}}Client constructs a {{.Name}}Client.
+func New{{.Name}}Client(cf frugal.CallFunc) *{{.Name}}Client {
+	return &{{.Name}}Client{
+		core: cf,
+	}
+}
+{{range .Methods}}
+// {{.Name}} calls a server.
+func (c *{{$.Name}}Client) {{.Name}}(ctx frugal.Context) error {
+	panic("TODO")
+}
+{{end}}
+`
+
 // GenerateService generates the given service.
 func (g *Generator) GenerateService(file *os.File, s *parser.Service) error {
-	contents := ""
-	contents += g.generateServiceInterface(s)
-	contents += g.generateClient(s)
-	contents += g.generateServer(s)
-	contents += g.generateServiceArgsResults(s)
+	// contents := ""
+	// contents += g.generateServiceInterface(s)
+	// contents += g.generateClient(s)
+	// // contents += g.generateServer(s)
+	// contents += g.generateServiceArgsResults(s)
 
-	_, err := file.WriteString(contents)
-	return err
+	// Make function names correct
+	for _, m := range s.Methods {
+		m.Name = title(m.Name)
+	}
+
+	// TODO: cache the template!
+	var funcMap = template.FuncMap{
+		"unpackField": func(field *parser.Field) string {
+			return g.generateReadFieldRec(field, true)
+		},
+		"fieldType": func(field *parser.Field) string {
+			return g.getGoTypeFromThriftTypePtr(field.Type, g.isPointerField(field))
+		},
+		"packField": func(field *parser.Field) string {
+			return g.generateWriteFieldRec(field, "p.")
+		},
+		"isUnion": func(s *parser.Struct) bool {
+			return s.Type == parser.StructTypeUnion
+		},
+	}
+	var serviceTemplate = template.Must(template.New("service").Funcs(funcMap).Parse(serviceTemplate))
+	return serviceTemplate.Execute(file, s)
 }
 
 func (g *Generator) generateServiceInterface(service *parser.Service) string {
@@ -1389,12 +1435,6 @@ func (g *Generator) generateReturnArgs(method *parser.Method) string {
 	}
 	return fmt.Sprintf("(r %s, err error)", g.getGoTypeFromThriftType(method.ReturnType))
 }
-
-const serviceTemplate = `
-type {{.Name}}Client struct {
-	// TODO: generate client
-}
-`
 
 func (g *Generator) generateClient(service *parser.Service) string {
 	servTitle := snakeToCamel(service.Name)
