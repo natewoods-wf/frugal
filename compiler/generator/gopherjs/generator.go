@@ -1324,82 +1324,73 @@ func (g *Generator) generateSubscribeMethod(scope *parser.Scope, op *parser.Oper
 }
 
 const serviceTemplate = `
+{{define "args"}}{{range .}}, {{.Name}} {{go .Type}}{{end}}{{end}}
+{{define "res"}}{{if .}}(r {{go .}}, err error){{else}}(err error){{end}}{{end}}
+{{define "func"}}{{title .Name}}(ctx frugal.Context{{template "args" .Arguments}}) {{template "res" .ReturnType}}{{end}}
+
 // {{.Name}} is a service or a client.
 type {{.Name}} interface {
 	{{range .Methods -}}
-	{{.Name}}(ctx frugal.Context, args ...interface{}) (res []interface{}, err error)
+	{{template "func" .}}
 	{{end -}}
 }
 
 // {{.Name}}Client is the client.
 type {{.Name}}Client struct {
-	core frugal.CallFunc
+	call frugal.CallFunc
 }
 
 // New{{.Name}}Client constructs a {{.Name}}Client.
 func New{{.Name}}Client(cf frugal.CallFunc) *{{.Name}}Client {
 	return &{{.Name}}Client{
-		core: cf,
+		call: cf,
 	}
 }
-{{range .Methods}}
+
+{{range .Methods -}}
 // {{.Name}} calls a server.
-func (c *{{$.Name}}Client) {{.Name}}(ctx frugal.Context) error {
+func (c *{{$.Name}}Client) {{template "func" .}} {
+	args := &{{$.Name}}{{title .Name}}Args{
+		{{range .Arguments -}}
+		{{title .Name}}: {{.Name}},
+		{{end -}}
+	}
+	res := &{{$.Name}}{{title .Name}}Result{}
+	if err := c.call(ctx, "{{$.Name}}", "{{.Name}}", args, res); err != nil {
+		panic(err)
+	}
 	panic("TODO")
 }
-{{end}}
+
+// {{$.Name}}{{title .Name}}Args are the arguments to {{title .Name}} calls.
+type {{$.Name}}{{title .Name}}Args struct {
+	{{range .Arguments -}}
+	{{title .Name}} {{go .Type}}
+	{{end -}}
+}
+
+// {{$.Name}}{{title .Name}}Result is the response to {{title .Name}} calls.
+type {{$.Name}}{{title .Name}}Result struct {
+	Success {{go .ReturnType}}
+	Err     *BaseError
+}
+{{end -}}
 `
 
 // GenerateService generates the given service.
 func (g *Generator) GenerateService(file *os.File, s *parser.Service) error {
 	// contents := ""
-	// contents += g.generateServiceInterface(s)
 	// contents += g.generateClient(s)
 	// // contents += g.generateServer(s)
 	// contents += g.generateServiceArgsResults(s)
 
-	// Make function names correct
-	for _, m := range s.Methods {
-		m.Name = title(m.Name)
-	}
-
 	// TODO: cache the template!
 	var funcMap = template.FuncMap{
-		"unpackField": func(field *parser.Field) string {
-			return g.generateReadFieldRec(field, true)
-		},
-		"fieldType": func(field *parser.Field) string {
-			return g.getGoTypeFromThriftTypePtr(field.Type, g.isPointerField(field))
-		},
-		"packField": func(field *parser.Field) string {
-			return g.generateWriteFieldRec(field, "p.")
-		},
-		"isUnion": func(s *parser.Struct) bool {
-			return s.Type == parser.StructTypeUnion
-		},
+		"title": title,
+		"go":    g.getGoTypeFromThriftType,
 	}
 	var serviceTemplate = template.Must(template.New("service").Funcs(funcMap).Parse(serviceTemplate))
 	return serviceTemplate.Execute(file, s)
-}
-
-func (g *Generator) generateServiceInterface(service *parser.Service) string {
-	contents := ""
-	if service.Comment != nil {
-		contents += g.GenerateInlineComment(service.Comment, "")
-	}
-
-	contents += fmt.Sprintf("type F%s interface {\n", snakeToCamel(service.Name))
-	if service.Extends != "" {
-		contents += fmt.Sprintf("\t%s\n\n", g.getServiceExtendsName(service))
-	}
-	for _, method := range service.Methods {
-		contents += g.generateCommentWithDeprecated(method.Comment, "\t", method.Annotations)
-		contents += fmt.Sprintf("\t%s(ctx frugal.Context%s) %s\n",
-			snakeToCamel(method.Name), g.generateInterfaceArgs(method.Arguments),
-			g.generateReturnArgs(method))
-	}
-	contents += "}\n\n"
-	return contents
 }
 
 func (g *Generator) getServiceExtendsName(service *parser.Service) string {
@@ -1890,14 +1881,6 @@ func (g *Generator) generateWriteApplicationError(service *parser.Service) strin
 	// contents += "}\n\n"
 	// return contents
 	return ``
-}
-
-func (g *Generator) generateInterfaceArgs(args []*parser.Field) string {
-	argStr := ""
-	for _, arg := range args {
-		argStr += ", " + arg.Name + " " + g.getGoTypeFromThriftType(arg.Type)
-	}
-	return argStr
 }
 
 func (g *Generator) generateClientOutputArgs(args []*parser.Field) string {
