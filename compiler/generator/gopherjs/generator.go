@@ -336,56 +336,6 @@ func (g *Generator) GenerateEnum(enum *parser.Enum) error {
 		contents += fmt.Sprintf("\t%s_%s %s = %d\n", eName, field.Name, eName, field.Value)
 	}
 	contents += ")\n\n"
-
-	// contents += fmt.Sprintf("func (p %s) String() string {\n", eName)
-	// contents += "\tswitch p {\n"
-	// for _, field := range enum.Values {
-	// 	contents += fmt.Sprintf("\tcase %s_%s:\n", eName, field.Name)
-	// 	contents += fmt.Sprintf("\t\treturn \"%s\"\n", field.Name)
-	// }
-	// contents += "\t}\n"
-	// contents += "\treturn \"<UNSET>\"\n"
-	// contents += "}\n\n"
-	//
-	// contents += fmt.Sprintf("func %sFromString(s string) (%s, error) {\n", eName, eName)
-	// contents += "\tswitch s {\n"
-	// for _, field := range enum.Values {
-	// 	contents += fmt.Sprintf("\tcase \"%s\":\n", field.Name)
-	// 	contents += fmt.Sprintf("\t\treturn %s_%s, nil\n", eName, field.Name)
-	// }
-	// contents += "\t}\n"
-	// contents += fmt.Sprintf("\treturn %s(0), fmt.Errorf(\"not a valid %s string\")\n", eName, eName)
-	// contents += "}\n\n"
-
-	// contents += fmt.Sprintf("func (p %s) MarshalText() ([]byte, error) {\n", eName)
-	// contents += "\treturn []byte(p.String()), nil\n"
-	// contents += "}\n\n"
-	//
-	// contents += fmt.Sprintf("func (p *%s) UnmarshalText(text []byte) error {\n", eName)
-	// contents += fmt.Sprintf("\tq, err := %sFromString(string(text))\n", eName)
-	// contents += "\tif err != nil {\n"
-	// contents += "\t\treturn err\n"
-	// contents += "\t}\n"
-	// contents += "\t*p = q\n"
-	// contents += "\treturn nil\n"
-	// contents += "}\n\n"
-
-	// contents += fmt.Sprintf("func (p *%s) Scan(value interface{}) error {\n", eName)
-	// contents += "\tv, ok := value.(int64)\n"
-	// contents += "\tif !ok {\n"
-	// contents += "\t\treturn errors.New(\"Scan value is not int64\")\n"
-	// contents += "\t}\n"
-	// contents += fmt.Sprintf("\t*p = %s(v)\n", eName)
-	// contents += fmt.Sprintf("\treturn nil\n")
-	// contents += "}\n\n"
-	//
-	// contents += fmt.Sprintf("func (p *%s) Value() (driver.Value, error) {\n", eName)
-	// contents += "\tif p == nil {\n"
-	// contents += "\t\treturn nil, nil\n"
-	// contents += "\t}\n"
-	// contents += "\treturn int64(*p), nil\n"
-	// contents += "}\n\n"
-
 	_, err := g.typesFile.WriteString(contents)
 	return err
 }
@@ -408,7 +358,7 @@ func (g *Generator) GenerateUnion(union *parser.Struct) error {
 func (g *Generator) GenerateException(exception *parser.Struct) error {
 	contents := g.generateStruct(exception)
 	contents += fmt.Sprintf("func (p *%s) Error() string {\n", title(exception.Name))
-	contents += "\treturn p.String()\n"
+	contents += "\treturn \"TODO: generate error strings\"\n"
 	contents += "}\n"
 
 	_, err := g.typesFile.WriteString(contents)
@@ -416,7 +366,7 @@ func (g *Generator) GenerateException(exception *parser.Struct) error {
 }
 
 const structTemplate = `
-// {{.Name}} is a frual serializable object.
+// {{title .Name}} is a frual serializable object.
 type {{title .Name}} struct {
 	{{range .Fields -}}
 	{{title .Name}} {{fieldType .}}
@@ -453,7 +403,7 @@ func (p *{{title .Name}}) Pack(prot frugal.Protocol) {
 	// TODO: sanity check for unions
 	count := 0
 	{{range .Fields -}}
-		if p.{{.Name}} != nil {
+		if p.{{title .Name}} != nil {
 			count++
 		}
 	{{end -}}
@@ -1221,28 +1171,28 @@ const serviceTemplate = `
 {{define "res"}}{{if .}}(r {{go .}}, err error){{else}}(err error){{end}}{{end}}
 {{define "func"}}{{title .Name}}(ctx frugal.Context{{template "args" .Arguments}}) {{template "res" .ReturnType}}{{end}}
 
-// {{.Name}} is a service or a client.
-type {{.Name}} interface {
+// {{title .Name}} is a service or a client.
+type {{title .Name}} interface {
 	{{range .Methods -}}
 	{{template "func" .}}
 	{{end -}}
 }
 
-// {{.Name}}Client is the client.
-type {{.Name}}Client struct {
+// {{title .Name}}Client is the client.
+type {{title .Name}}Client struct {
 	call frugal.CallFunc
 }
 
-// New{{.Name}}Client constructs a {{.Name}}Client.
-func New{{.Name}}Client(cf frugal.CallFunc) *{{.Name}}Client {
+// New{{title .Name}}Client constructs a {{.Name}}Client.
+func New{{title .Name}}Client(cf frugal.CallFunc) *{{.Name}}Client {
 	return &{{.Name}}Client{
 		call: cf,
 	}
 }
 
 {{range .Methods -}}
-// {{.Name}} calls a server.
-func (c *{{$.Name}}Client) {{template "func" .}} {
+// {{title .Name}} calls a server.
+func (c *{{title $.Name}}Client) {{template "func" .}} {
 	args := &{{$.Name}}{{title .Name}}Args{
 		{{range .Arguments -}}
 		{{title .Name}}: {{.Name}},
@@ -1276,6 +1226,13 @@ type {{$.Name}}{{title .Name}}Args struct {
 	{{end -}}
 }
 
+// Pack serializes {{$.Name}}{{title .Name}}Args objects.
+func (p *{{$.Name}}{{title .Name}}Args) Pack(prot frugal.Protocol) {
+  prot.PackStructBegin("{{$.Name}}{{title .Name}}Args")
+	{{range .Arguments}}{{packField .}}{{end -}}
+  prot.PackStructEnd()
+}
+
 {{if not .Oneway}}
 // {{$.Name}}{{title .Name}}Result is the response to {{title .Name}} calls.
 type {{$.Name}}{{title .Name}}Result struct {
@@ -1283,6 +1240,27 @@ type {{$.Name}}{{title .Name}}Result struct {
 	{{range .Exceptions -}}
 	{{title .Name}} {{go .Type}}
 	{{end -}}
+}
+
+// Unpack deserializes {{$.Name}}{{title .Name}}Result objects.
+func (p *{{$.Name}}{{title .Name}}Result) Unpack(prot frugal.Protocol) {
+	prot.UnpackStructBegin("{{$.Name}}{{title .Name}}Result")
+	for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
+		switch id {
+		{{if .ReturnType -}}
+		case 0:
+			{{unpackSuccess .ReturnType -}}
+		{{end -}}
+		{{range .Exceptions -}}
+		case {{.ID}}:
+			{{unpackField . -}}
+		{{end -}}
+		default:
+			prot.Skip(typeID)
+		}
+		prot.UnpackFieldEnd()
+	}
+	prot.UnpackStructEnd()
 }
 {{end -}}
 
@@ -1298,6 +1276,18 @@ func (g *Generator) GenerateService(file *os.File, s *parser.Service) error {
 		"title": title,
 		"go":    g.getGoTypeFromThriftType,
 		"lower": parser.LowercaseFirstLetter,
+		"unpackField": func(field *parser.Field) string {
+			return g.generateReadFieldRec(field, true)
+		},
+		"packField": func(field *parser.Field) string {
+			return g.generateWriteFieldRec(field, "p.")
+		},
+		"unpackSuccess": func(t *parser.Type) string {
+			return g.generateReadFieldRec(&parser.Field{
+				Name: "success",
+				Type: t,
+			}, true)
+		},
 	}
 	var serviceTemplate = template.Must(template.New("service").Funcs(funcMap).Parse(serviceTemplate))
 	return serviceTemplate.Execute(file, s)
