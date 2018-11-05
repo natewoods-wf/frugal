@@ -309,39 +309,32 @@ func (g *Generator) generateConstantValue(t *parser.Type, value interface{}) str
 
 // GenerateTypeDef generates the given typedef.
 func (g *Generator) GenerateTypeDef(typedef *parser.TypeDef) error {
-	contents := ""
-
-	if typedef.Comment != nil {
-		contents += g.GenerateInlineComment(typedef.Comment, "")
-	}
-
+	contents := fmt.Sprintf("// %s is a typeDef\n", title(typedef.Name))
 	contents += fmt.Sprintf("type %s %s\n", title(typedef.Name), g.getGoTypeFromThriftType(typedef.Type))
 	_, err := g.typesFile.WriteString(contents)
 	return err
 }
 
+var enumTemplate = `
+// {{title .Name}} is an enum.
+type {{title .Name}} int64
+
+// {{title .Name}} values.
+const (
+	{{range .Values -}}
+	{{title $.Name}}{{.Name}} {{title $.Name}} = {{.Value}}
+	{{end -}}
+)
+`
+
 // GenerateEnum generates the given enum.
 func (g *Generator) GenerateEnum(enum *parser.Enum) error {
-	// An enum is basically a typedef for int with a couple constants and functions
-	contents := ""
-
-	eName := title(enum.Name)
-	contents += fmt.Sprintf("// %s is an enum.\n", eName)
-
-	if enum.Comment != nil {
-		contents += g.GenerateInlineComment(enum.Comment, "")
+	// TODO: cache the template!
+	var funcMap = template.FuncMap{
+		"title": title,
 	}
-
-	contents += fmt.Sprintf("type %s int64\n\n", eName)
-	contents += fmt.Sprintf("// %s values.\n", eName)
-	contents += "const (\n"
-	for _, field := range enum.Values {
-		contents += g.generateCommentWithDeprecated(field.Comment, "\t", field.Annotations)
-		contents += fmt.Sprintf("\t%s%s %s = %d\n", eName, field.Name, eName, field.Value)
-	}
-	contents += ")\n\n"
-	_, err := g.typesFile.WriteString(contents)
-	return err
+	var enumTemplate = template.Must(template.New("enum").Funcs(funcMap).Parse(enumTemplate))
+	return enumTemplate.Execute(g.typesFile, enum)
 }
 
 // GenerateStruct generates the given struct.
@@ -448,59 +441,6 @@ func (g *Generator) generateStruct(s *parser.Struct) string {
 		panic(err)
 	}
 	return buff.String()
-}
-
-func (g *Generator) generateCommentWithDeprecated(comment []string, indent string, anns parser.Annotations) string {
-	contents := ""
-	if comment != nil {
-		contents += g.GenerateInlineComment(comment, indent)
-	}
-
-	deprecationValue, deprecated := anns.Deprecated()
-	if deprecated && deprecationValue != "" {
-		if deprecationValue == "" {
-			contents += indent + "// Deprecated\n"
-		} else {
-			contents += fmt.Sprintf("%s// Deprecated: %s\n", indent, deprecationValue)
-		}
-	}
-
-	return contents
-}
-
-func (g *Generator) generateStructDeclaration(s *parser.Struct, sName string) string {
-	contents := ""
-	if s.Comment != nil {
-		contents += g.GenerateInlineComment(s.Comment, "")
-	}
-
-	contents += fmt.Sprintf("type %s struct {\n", sName)
-
-	// Declare fields
-	for _, field := range s.Fields {
-		fName := title(field.Name)
-		// All fields in a union are marked optional by default
-
-		contents += g.generateCommentWithDeprecated(field.Comment, "\t", field.Annotations)
-
-		// Use the actual field name for annotations because the serialized
-		// name needs to be the same for all languages
-		thriftAnnotation := fmt.Sprintf("%s,%d", field.Name, field.ID)
-		if field.Modifier == parser.Required {
-			thriftAnnotation += ",required"
-		}
-		jsonAnnotation := field.Name
-		if field.Modifier == parser.Optional {
-			jsonAnnotation += ",omitempty"
-		}
-		annotation := "" //fmt.Sprintf("`thrift:\"%s\" db:\"%s\" json:\"%s\"`", thriftAnnotation, field.Name, jsonAnnotation)
-
-		goType := g.getGoTypeFromThriftTypePtr(field.Type, g.isPointerField(field))
-		contents += fmt.Sprintf("\t%s %s %s\n", fName, goType, annotation)
-	}
-
-	contents += "}\n\n"
-	return contents
 }
 
 func (g *Generator) generateConstructor(s *parser.Struct, sName string) string {
