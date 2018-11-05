@@ -191,6 +191,7 @@ func (g *Generator) GenerateConstantsContents(constants []*parser.Constant) erro
 		value := g.generateConstantValue(constant.Type, constant.Value)
 		// Don't use underlying type so typedefs aren't consts
 		if (constant.Type.IsPrimitive() || g.Frugal.IsEnum(constant.Type)) && constant.Type.Name != "binary" {
+			contents += fmt.Sprintf("// %s is a constant.\n", cName)
 			contents += fmt.Sprintf("const %s = %s\n\n", cName, value)
 		} else {
 			contents += fmt.Sprintf("var %s %s\n\n", cName, g.getGoTypeFromThriftType(constant.Type))
@@ -324,16 +325,19 @@ func (g *Generator) GenerateEnum(enum *parser.Enum) error {
 	// An enum is basically a typedef for int with a couple constants and functions
 	contents := ""
 
+	eName := title(enum.Name)
+	contents += fmt.Sprintf("// %s is an enum.\n", eName)
+
 	if enum.Comment != nil {
 		contents += g.GenerateInlineComment(enum.Comment, "")
 	}
 
-	eName := title(enum.Name)
 	contents += fmt.Sprintf("type %s int64\n\n", eName)
+	contents += fmt.Sprintf("// %s values.\n", eName)
 	contents += "const (\n"
 	for _, field := range enum.Values {
 		contents += g.generateCommentWithDeprecated(field.Comment, "\t", field.Annotations)
-		contents += fmt.Sprintf("\t%s_%s %s = %d\n", eName, field.Name, eName, field.Value)
+		contents += fmt.Sprintf("\t%s%s %s = %d\n", eName, field.Name, eName, field.Value)
 	}
 	contents += ")\n\n"
 	_, err := g.typesFile.WriteString(contents)
@@ -1697,12 +1701,12 @@ func (g *Generator) qualifiedTypeName(t *parser.Type) string {
 		param = fmt.Sprintf("%s.%s", includeNameToReference(name), param)
 	}
 
-	// The Thrift generator uses a convention of appending a suffix of '_'
-	// if the argument starts with 'New', ends with 'Result' or ends with 'Args'.
-	// This effort must be duplicated to correctly reference Thrift generated code.
-	if strings.HasPrefix(param, "New") || strings.HasSuffix(param, "Result") || strings.HasSuffix(param, "Args") {
-		param += "_"
-	}
+	// // The Thrift generator uses a convention of appending a suffix of '_'
+	// // if the argument starts with 'New', ends with 'Result' or ends with 'Args'.
+	// // This effort must be duplicated to correctly reference Thrift generated code.
+	// if strings.HasPrefix(param, "New") || strings.HasSuffix(param, "Result") || strings.HasSuffix(param, "Args") {
+	// 	param += "_"
+	// }
 	return param
 }
 
@@ -1747,10 +1751,6 @@ func snakeToCamel(s string) string {
 }
 
 func title(name string) string {
-	return titleServiceName(name, "")
-}
-
-func titleServiceName(name string, serviceName string) string {
 	if len(name) == 0 {
 		return name
 	}
@@ -1759,16 +1759,11 @@ func titleServiceName(name string, serviceName string) string {
 	if name == strings.ToUpper(name) {
 		return name
 	}
-
-	if serviceName != "" {
-		name = fmt.Sprintf("%s_%s", serviceName, name)
-	}
 	result := snakeToCamel(name)
 
-	if (serviceName == "") && (strings.HasPrefix(result, "New") || strings.HasSuffix(result, "Args") || strings.HasSuffix(result, "Result")) {
-		result += "_"
-	}
-
+	// if strings.HasPrefix(result, "New") || strings.HasSuffix(result, "Args") || strings.HasSuffix(result, "Result") {
+	// 	result += "_"
+	// }
 	return result
 }
 
