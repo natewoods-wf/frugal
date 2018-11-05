@@ -415,34 +415,23 @@ func (g *Generator) GenerateException(exception *parser.Struct) error {
 	return err
 }
 
-// generateServiceArgsResults generates the args and results objects for the
-// given service.
-func (g *Generator) generateServiceArgsResults(service *parser.Service) string {
-	contents := ""
-	for _, s := range g.GetServiceMethodTypes(service) {
-		s.Name = service.Name + "_" + s.Name // add service types here
-		contents += g.generateStruct(s)
-	}
-	return contents
-}
-
 const structTemplate = `
 // {{.Name}} is a frual serializable object.
-type {{.Name}} struct {
+type {{title .Name}} struct {
 	{{range .Fields -}}
-	{{.Name}} {{fieldType .}}
+	{{title .Name}} {{fieldType .}}
 	{{end}}
 }
 
-// New{{.Name}} constructs a {{.Name}}.
-func New{{.Name}}() *{{.Name}} {
-	return &{{.Name}}{
+// New{{title .Name}} constructs a {{title .Name}}.
+func New{{title .Name}}() *{{title .Name}} {
+	return &{{title .Name}}{
 		// TODO: default values
 	}
 }
 
 // Unpack deserializes {{.Name}} objects.
-func (p *{{.Name}}) Unpack(prot frugal.Protocol) {
+func (p *{{title .Name}}) Unpack(prot frugal.Protocol) {
   prot.UnpackStructBegin("{{.Name}}")
   for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
     switch id {
@@ -459,7 +448,7 @@ func (p *{{.Name}}) Unpack(prot frugal.Protocol) {
 }
 
 // Pack serializes {{.Name}} objects.
-func (p *{{.Name}}) Pack(prot frugal.Protocol) {
+func (p *{{title .Name}}) Pack(prot frugal.Protocol) {
 	{{if isUnion . -}}
 	// TODO: sanity check for unions
 	count := 0
@@ -481,13 +470,9 @@ func (p *{{.Name}}) Pack(prot frugal.Protocol) {
 
 func (g *Generator) generateStruct(s *parser.Struct) string {
 
-	// Fix the names of fields
-	for _, field := range s.Fields {
-		field.Name = title(field.Name)
-	}
-
 	// TODO: cache the template!
 	var funcMap = template.FuncMap{
+		"title": title,
 		"unpackField": func(field *parser.Field) string {
 			return g.generateReadFieldRec(field, true)
 		},
@@ -581,98 +566,6 @@ func (g *Generator) generateConstructor(s *parser.Struct, sName string) string {
 	contents += "\t}\n"
 	contents += "}\n\n"
 	return contents
-}
-
-func (g *Generator) generateGetters(s *parser.Struct, sName string) string {
-	return ""
-	// contents := ""
-	//
-	// for _, field := range s.Fields {
-	// 	fName := title(field.Name)
-	// 	isPointer := g.isPointerField(field)
-	// 	// goType := g.getGoTypeFromThriftTypePtr(field.Type, false)
-	// 	// goPtrType := g.getGoTypeFromThriftTypePtr(field.Type, true)
-	// 	underlyingType := g.Frugal.UnderlyingType(field.Type)
-	//
-	// 	if field.Modifier == parser.Optional || isPointer {
-	// 		// // Generate a default for getters
-	// 		// contents += fmt.Sprintf("var %s_%s_DEFAULT %s", sName, fName, goType)
-	// 		// if field.Default != nil {
-	// 		// 	val := g.generateConstantValue(field.Type, field.Default)
-	// 		// 	contents += fmt.Sprintf(" = %s", val)
-	// 		// }
-	// 		// contents += "\n\n"
-	//
-	// 		// Determines if the field is set
-	// 		contents += fmt.Sprintf("func (p *%s) IsSet%s() bool {\n", sName, fName)
-	// 		if isPointer || underlyingType.IsContainer() || (underlyingType.Name == "binary" && field.Default == nil) {
-	// 			// Compare these to nil
-	// 			contents += fmt.Sprintf("\treturn p.%s != nil\n", fName)
-	// 		} else if underlyingType.Name == "binary" {
-	// 			// Binary fields are byte slices, can't compare slices with ==
-	// 			contents += fmt.Sprintf("\treturn !bytes.Equal(p.%s, %s_%s_DEFAULT)\n", fName, sName, fName)
-	// 		} else {
-	// 			// Otherwise compare to default
-	// 			contents += fmt.Sprintf("\treturn p.%s != %s_%s_DEFAULT\n", fName, sName, fName)
-	// 		}
-	// 		contents += "}\n\n"
-	// 	}
-	// 	// if isPointer {
-	// 	// 	// Need to dereference the field before returning if it's a pointer
-	// 	// 	maybePointer := ""
-	// 	// 	if goType != goPtrType {
-	// 	// 		maybePointer = "*"
-	// 	// 	}
-	// 	// 	contents += fmt.Sprintf("func (p *%s) Get%s() %s {\n", sName, fName, goType)
-	// 	// 	contents += fmt.Sprintf("\tif !p.IsSet%s() {\n", fName)
-	// 	// 	contents += fmt.Sprintf("\t\treturn %s_%s_DEFAULT\n", sName, fName)
-	// 	// 	contents += "\t}\n"
-	// 	// 	contents += fmt.Sprintf("\treturn %sp.%s\n", maybePointer, fName)
-	// 	// 	contents += "}\n\n"
-	// 	//
-	// 	// } else {
-	// 	// 	contents += fmt.Sprintf("func (p *%s) Get%s() %s {\n", sName, fName, g.getGoTypeFromThriftType(field.Type))
-	// 	// 	contents += fmt.Sprintf("\treturn p.%s\n", fName)
-	// 	// 	contents += "}\n\n"
-	// 	// }
-	// }
-	// return contents
-}
-
-func (g *Generator) generateWrite(s *parser.Struct, sName string) string {
-	return ""
-	// contents := fmt.Sprintf("func (p *%s) Write(oprot thrift.TProtocol) error {\n", sName)
-	//
-	// // Only one field can be set for a union, make sure that's the case
-	// if s.Type == parser.StructTypeUnion {
-	// 	contents += fmt.Sprintf("\tif c := p.CountSetFields%s(); c != 1 {\n", sName)
-	// 	contents += "\t\treturn thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf(\"%T write union: exactly one field must be set (%d set).\", p, c))\n"
-	// 	contents += "\t}\n"
-	// }
-	//
-	// // Use actual struct name so it's consistent between languages
-	// contents += fmt.Sprintf("\tif err := oprot.WriteStructBegin(\"%s\"); err != nil {\n", s.Name)
-	// contents += "\t\treturn thrift.PrependError(fmt.Sprintf(\"%T write struct begin error: \", p), err)\n"
-	// contents += "\t}\n"
-	//
-	// for _, field := range s.Fields {
-	// 	contents += g.generateWriteFieldInline(field)
-	// }
-	//
-	// contents += "\tif err := oprot.WriteFieldStop(); err != nil{\n"
-	// contents += "\t\treturn thrift.PrependError(\"write field stop error: \", err)\n"
-	// contents += "\t}\n"
-	// contents += "\tif err := oprot.WriteStructEnd(); err != nil {\n"
-	// contents += "\t\treturn thrift.PrependError(\"write struct stop error: \", err)\n"
-	// contents += "\t}\n"
-	// contents += "\treturn nil\n"
-	// contents += "}\n\n"
-	//
-	// for _, field := range s.Fields {
-	// 	contents += g.generateWriteField(sName, field)
-	// }
-	//
-	// return contents
 }
 
 func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string {
@@ -1355,11 +1248,25 @@ func (c *{{$.Name}}Client) {{template "func" .}} {
 		{{title .Name}}: {{.Name}},
 		{{end -}}
 	}
-	res := &{{$.Name}}{{title .Name}}Result{}
-	if err := c.call(ctx, "{{$.Name}}", "{{.Name}}", args, res); err != nil {
-		panic(err)
-	}
-	panic("TODO")
+	{{if .Oneway -}}
+		return c.call(ctx, "{{lower $.Name}}", "{{lower .Name}}", args, nil)
+	{{else -}}
+		res := &{{$.Name}}{{title .Name}}Result{}
+		err = c.call(ctx, "{{lower $.Name}}", "{{lower .Name}}", args, res)
+		if err != nil {
+			return
+		}
+		{{range .Exceptions -}}
+		if err = res.{{title .Name}}; err != nil {
+			return
+		}
+		{{end -}}
+		{{if .ReturnType -}}
+			return res.Success, nil
+		{{else -}}
+			return nil
+		{{end -}}
+	{{end -}}
 }
 
 // {{$.Name}}{{title .Name}}Args are the arguments to {{title .Name}} calls.
@@ -1369,41 +1276,31 @@ type {{$.Name}}{{title .Name}}Args struct {
 	{{end -}}
 }
 
+{{if not .Oneway}}
 // {{$.Name}}{{title .Name}}Result is the response to {{title .Name}} calls.
 type {{$.Name}}{{title .Name}}Result struct {
-	Success {{go .ReturnType}}
-	Err     *BaseError
+	{{if .ReturnType}}Success {{go .ReturnType}}{{end}}
+	{{range .Exceptions -}}
+	{{title .Name}} {{go .Type}}
+	{{end -}}
 }
+{{end -}}
+
 {{end -}}
 `
 
 // GenerateService generates the given service.
 func (g *Generator) GenerateService(file *os.File, s *parser.Service) error {
-	// contents := ""
-	// contents += g.generateClient(s)
-	// // contents += g.generateServer(s)
-	// contents += g.generateServiceArgsResults(s)
+	// contents += g.generateServer(s)
 
 	// TODO: cache the template!
 	var funcMap = template.FuncMap{
 		"title": title,
 		"go":    g.getGoTypeFromThriftType,
+		"lower": parser.LowercaseFirstLetter,
 	}
 	var serviceTemplate = template.Must(template.New("service").Funcs(funcMap).Parse(serviceTemplate))
 	return serviceTemplate.Execute(file, s)
-}
-
-func (g *Generator) getServiceExtendsName(service *parser.Service) string {
-	serviceName := "F" + service.ExtendsService()
-	include := service.ExtendsInclude()
-	if include != "" {
-		if namespace := g.Frugal.NamespaceForInclude(include, lang); namespace != nil {
-			include = namespace.Value
-		}
-		include = includeNameToReference(include)
-		serviceName = include + "." + serviceName
-	}
-	return serviceName
 }
 
 func (g *Generator) getServiceExtendsNamespace(service *parser.Service) string {
@@ -1420,224 +1317,12 @@ func (g *Generator) getServiceExtendsNamespace(service *parser.Service) string {
 	return namespace
 }
 
-func (g *Generator) generateReturnArgs(method *parser.Method) string {
-	if method.ReturnType == nil {
-		return "(err error)"
-	}
-	return fmt.Sprintf("(r %s, err error)", g.getGoTypeFromThriftType(method.ReturnType))
-}
-
-func (g *Generator) generateClient(service *parser.Service) string {
-	servTitle := snakeToCamel(service.Name)
-	contents := ""
-	if service.Comment != nil {
-		contents += g.GenerateInlineComment(service.Comment, "")
-	}
-
-	contents += fmt.Sprintf("type F%sClient struct {\n", servTitle)
-	if service.Extends != "" {
-		contents += fmt.Sprintf("\t*%sClient\n", g.getServiceExtendsName(service))
-	}
-	contents += "\ttransport       frugal.FTransport\n"
-	contents += "\tprotocolFactory *frugal.FProtocolFactory\n"
-	contents += "\tmethods         map[string]*frugal.Method\n"
-	contents += "}\n\n"
-
-	contents += fmt.Sprintf(
-		"func NewF%sClient(provider *frugal.FServiceProvider, middleware ...frugal.ServiceMiddleware) *F%sClient {\n",
-		servTitle, servTitle)
-	contents += "\tmethods := make(map[string]*frugal.Method)\n"
-	contents += fmt.Sprintf("\tclient := &F%sClient{\n", servTitle)
-	if service.Extends != "" {
-		contents += fmt.Sprintf("\t\tF%sClient: %sNewF%sClient(provider, middleware...),\n",
-			service.ExtendsService(), g.getServiceExtendsNamespace(service), service.ExtendsService())
-	}
-	contents += "\t\ttransport:       provider.GetTransport(),\n"
-	contents += "\t\tprotocolFactory: provider.GetProtocolFactory(),\n"
-	contents += "\t\tmethods:         methods,\n"
-	contents += "\t}\n"
-	contents += "\tmiddleware = append(middleware, provider.GetMiddleware()...)\n"
-	for _, method := range service.Methods {
-		name := parser.LowercaseFirstLetter(method.Name)
-		contents += fmt.Sprintf("\tmethods[\"%s\"] = frugal.NewMethod(client, client.%s, \"%s\", middleware)\n", name, name, name)
-	}
-	contents += "\treturn client\n"
-	contents += "}\n\n"
-
-	for _, method := range service.Methods {
-		contents += g.generateClientMethod(service, method)
-	}
-	return contents
-}
-
-func (g *Generator) generateClientMethod(service *parser.Service, method *parser.Method) string {
-	var (
-		servTitle = snakeToCamel(service.Name)
-		nameTitle = snakeToCamel(method.Name)
-		nameLower = parser.LowercaseFirstLetter(method.Name)
-	)
-
-	contents := ""
-	if method.Comment != nil {
-		contents += g.GenerateInlineComment(method.Comment, "")
-	}
-
-	deprecationValue, deprecated := method.Annotations.Deprecated()
-	if deprecated {
-		if deprecationValue != "" {
-			deprecationValue = ": " + deprecationValue
-		}
-		contents += fmt.Sprintf("// Deprecated%s\n", deprecationValue)
-	}
-
-	contents += fmt.Sprintf("func (f *F%sClient) %s(ctx frugal.Context%s) %s {\n",
-		servTitle, nameTitle, g.generateInputArgs(method.Arguments), g.generateReturnArgs(method))
-
-	if deprecated {
-		contents += fmt.Sprintf("\tlogrus.Warn(\"Call to deprecated function '%s.%s'\")\n", service.Name, nameTitle)
-	}
-
-	contents += fmt.Sprintf("\tret := f.methods[\"%s\"].Invoke(%s)\n", nameLower, g.generateClientArgs(method))
-	numReturn := "2"
-	if method.ReturnType == nil {
-		numReturn = "1"
-	}
-	contents += fmt.Sprintf("\tif len(ret) != %s {\n", numReturn)
-	contents += fmt.Sprintf("\t\tpanic(fmt.Sprintf(\"Middleware returned %%d arguments, expected %s\", len(ret)))\n", numReturn)
-	contents += "\t}\n"
-	if method.ReturnType != nil {
-		contents += "\tif ret[0] != nil {\n"
-		contents += fmt.Sprintf("\t\tr = ret[0].(%s)\n", g.getGoTypeFromThriftType(method.ReturnType))
-		contents += "\t}\n"
-		contents += "\tif ret[1] != nil {\n"
-		contents += "\t\terr = ret[1].(error)\n"
-		contents += "\t}\n"
-		contents += "\treturn r, err\n"
-	} else {
-		contents += "\tif ret[0] != nil {\n"
-		contents += "\t\terr = ret[0].(error)\n"
-		contents += "\t}\n"
-		contents += "\treturn err\n"
-	}
-	contents += "}\n\n"
-	contents += g.generateInternalClientMethod(service, method)
-	return contents
-}
-
-func (g *Generator) generateInternalClientMethod(service *parser.Service, method *parser.Method) string {
-	var (
-		servTitle = snakeToCamel(service.Name)
-		nameTitle = snakeToCamel(method.Name)
-		nameLower = parser.LowercaseFirstLetter(method.Name)
-	)
-
-	contents := ""
-	contents += fmt.Sprintf("func (f *F%sClient) %s(ctx frugal.Context%s) %s {\n",
-		servTitle, nameLower, g.generateInputArgs(method.Arguments), g.generateReturnArgs(method))
-
-	contents += "\tbuffer := frugal.NewTMemoryOutputBuffer(f.transport.GetRequestSizeLimit())\n"
-	contents += "\toprot := f.protocolFactory.GetProtocol(buffer)\n"
-	contents += "\tif err = oprot.WriteRequestHeader(ctx); err != nil {\n"
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-	msgType := "CALL"
-	if method.Oneway {
-		msgType = "ONEWAY"
-	}
-	contents += fmt.Sprintf(
-		"\tif err = oprot.WriteMessageBegin(\"%s\", thrift.%s, 0); err != nil {\n", nameLower, msgType)
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-	contents += fmt.Sprintf("\targs := %s%sArgs{\n", servTitle, nameTitle)
-	contents += g.generateStructArgs(method.Arguments)
-	contents += "\t}\n"
-	contents += "\tif err = args.Write(oprot); err != nil {\n"
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-	contents += "\tif err = oprot.WriteMessageEnd(); err != nil {\n"
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-	contents += "\tif err = oprot.Flush(); err != nil {\n"
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-
-	if method.Oneway {
-		contents += "\terr = f.transport.Oneway(ctx, buffer.Bytes())\n"
-		contents += "\treturn\n"
-		contents += "}\n\n"
-		return contents
-	}
-	contents += "\tvar resultTransport thrift.TTransport\n"
-	contents += "\tresultTransport, err = f.transport.Request(ctx, buffer.Bytes())\n"
-	contents += "\tif err != nil {\n"
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-
-	contents += "\tiprot := f.protocolFactory.GetProtocol(resultTransport)\n"
-	contents += "\tif err = iprot.ReadResponseHeader(ctx); err != nil {\n"
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-	contents += "\tmethod, mTypeId, _, err := iprot.ReadMessageBegin()\n"
-	contents += "\tif err != nil {\n"
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-	contents += fmt.Sprintf("\tif method != \"%s\" {\n", nameLower)
-	contents += fmt.Sprintf(
-		"\t\terr = thrift.NewTApplicationException(frugal.APPLICATION_EXCEPTION_WRONG_METHOD_NAME, \"%s failed: wrong method name\")\n", nameLower)
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-	contents += "\tif mTypeId == thrift.EXCEPTION {\n"
-	contents += "\t\terror0 := thrift.NewTApplicationException(frugal.APPLICATION_EXCEPTION_UNKNOWN, \"Unknown Exception\")\n"
-	contents += "\t\tvar error1 thrift.TApplicationException\n"
-	contents += "\t\terror1, err = error0.Read(iprot)\n"
-	contents += "\t\tif err != nil {\n"
-	contents += "\t\t\t\treturn\n"
-	contents += "\t\t}\n"
-	contents += "\t\tif err = iprot.ReadMessageEnd(); err != nil {\n"
-	contents += "\t\t\treturn\n"
-	contents += "\t\t}\n"
-	contents += "\t\tif error1.TypeId() == frugal.APPLICATION_EXCEPTION_RESPONSE_TOO_LARGE {\n"
-	contents += "\t\t\terr = thrift.NewTTransportException(frugal.TRANSPORT_EXCEPTION_RESPONSE_TOO_LARGE, error1.Error())\n"
-	contents += "\t\t\t\treturn\n"
-	contents += "\t\t}\n"
-	contents += "\t\terr = error1\n"
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-	contents += "\tif mTypeId != thrift.REPLY {\n"
-	contents += fmt.Sprintf(
-		"\t\terr = thrift.NewTApplicationException(frugal.APPLICATION_EXCEPTION_INVALID_MESSAGE_TYPE, \"%s failed: invalid message type\")\n", nameLower)
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-	contents += fmt.Sprintf("\tresult := %s%sResult{}\n", servTitle, nameTitle)
-	contents += "\tif err = result.Read(iprot); err != nil {\n"
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-	contents += "\tif err = iprot.ReadMessageEnd(); err != nil {\n"
-	contents += "\t\treturn\n"
-	contents += "\t}\n"
-	for _, err := range method.Exceptions {
-		errTitle := snakeToCamel(err.Name)
-		contents += fmt.Sprintf("\tif result.%s != nil {\n", errTitle)
-		contents += fmt.Sprintf("\t\terr = result.%s\n", errTitle)
-		contents += "\t\treturn\n"
-		contents += "\t}\n"
-	}
-	if method.ReturnType != nil {
-		contents += "\tr = result.GetSuccess()\n"
-	}
-	contents += "\treturn\n"
-	contents += "}\n\n"
-
-	return contents
-}
-
 func (g *Generator) generateServer(service *parser.Service) string {
 	contents := ""
 	contents += g.generateProcessor(service)
 	for _, method := range service.Methods {
 		contents += g.generateMethodProcessor(service, method)
 	}
-	contents += g.generateWriteApplicationError(service)
 	return contents
 }
 
@@ -1831,13 +1516,6 @@ func (g *Generator) generateHandlerArgs(method *parser.Method) string {
 	args += "}"
 	return args
 }
-func (g *Generator) generateCallArgs(method *parser.Method) string {
-	args := "ctx"
-	for _, arg := range method.Arguments {
-		args += ", " + strings.ToLower(arg.Name)
-	}
-	return args
-}
 
 func (g *Generator) generateErrTooLarge(service *parser.Service, method *parser.Method) string {
 	servLower := strings.ToLower(service.Name)
@@ -1865,46 +1543,6 @@ func (g *Generator) generateMethodException(prefix string, service *parser.Servi
 	}
 	contents += prefix + "return err2\n"
 	return contents
-}
-
-func (g *Generator) generateWriteApplicationError(service *parser.Service) string {
-	// servLower := strings.ToLower(service.Name)
-	// contents := fmt.Sprintf("func %sWriteApplicationError(ctx frugal.Context, oprot *frugal.FProtocol, "+
-	// 	"type_ int32, method, message string) error {\n", servLower)
-	// contents += "\tx := thrift.NewTApplicationException(type_, message)\n"
-	// contents += "\toprot.WriteResponseHeader(ctx)\n"
-	// contents += "\toprot.WriteMessageBegin(method, thrift.EXCEPTION, 0)\n"
-	// contents += "\tx.Write(oprot)\n"
-	// contents += "\toprot.WriteMessageEnd()\n"
-	// contents += "\toprot.Flush()\n"
-	// contents += "\treturn x\n"
-	// contents += "}\n\n"
-	// return contents
-	return ``
-}
-
-func (g *Generator) generateClientOutputArgs(args []*parser.Field) string {
-	argStr := ""
-	for _, arg := range args {
-		argStr += ", " + strings.ToLower(arg.Name)
-	}
-	return argStr
-}
-
-func (g *Generator) generateInputArgs(args []*parser.Field) string {
-	argStr := ""
-	for _, arg := range args {
-		argStr += ", " + strings.ToLower(arg.Name) + " " + g.getGoTypeFromThriftType(arg.Type)
-	}
-	return argStr
-}
-
-func (g *Generator) generateStructArgs(args []*parser.Field) string {
-	argStr := ""
-	for _, arg := range args {
-		argStr += "\t\t" + title(arg.Name) + ": " + strings.ToLower(arg.Name) + ",\n"
-	}
-	return argStr
 }
 
 func (g *Generator) getGoTypeFromThriftType(t *parser.Type) string {
