@@ -211,7 +211,25 @@ type {{$.Name}}{{title .Name}}Args struct {
 func (p *{{$.Name}}{{title .Name}}Args) Pack(prot frugal.Protocol) {
   prot.PackStructBegin("{{$.Name}}{{title .Name}}Args")
 	{{range .Arguments}}{{packField .}}{{end -}}
+	prot.PackFieldStop()
   prot.PackStructEnd()
+}
+
+// Unpack deserializes {{$.Name}}{{title .Name}}Args objects.
+func (p *{{$.Name}}{{title .Name}}Args) Unpack(prot frugal.Protocol) {
+	prot.UnpackStructBegin("{{$.Name}}{{title .Name}}Args")
+	for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
+		switch id {
+		{{range .Arguments -}}
+		case {{.ID}}:
+			{{unpackField . -}}
+		{{end -}}
+		default:
+			prot.Skip(typeID)
+		}
+		prot.UnpackFieldEnd()
+	}
+	prot.UnpackStructEnd()
 }
 
 {{if not .Oneway}}
@@ -221,6 +239,15 @@ type {{$.Name}}{{title .Name}}Result struct {
 	{{range .Exceptions -}}
 	{{title .Name}} {{go .Type}}
 	{{end -}}
+}
+
+// Pack serializes {{$.Name}}{{title .Name}}Result objects.
+func (p *{{$.Name}}{{title .Name}}Result) Pack(prot frugal.Protocol) {
+  prot.PackStructBegin("{{$.Name}}{{title .Name}}Result")
+	{{packSuccess .ReturnType -}}
+	{{range .Exceptions}}{{packField .}}{{end -}}
+	prot.PackFieldStop()
+  prot.PackStructEnd()
 }
 
 // Unpack deserializes {{$.Name}}{{title .Name}}Result objects.
@@ -246,6 +273,45 @@ func (p *{{$.Name}}{{title .Name}}Result) Unpack(prot frugal.Protocol) {
 {{end -}}
 
 {{end -}}
+
+// {{title .Name}}Processor is the client.
+type {{title .Name}}Processor struct {
+	handler {{title .Name}}
+}
+
+// New{{title .Name}}Processor constructs a {{.Name}}Processor.
+func New{{title .Name}}Processor(handler {{title .Name}}) *{{.Name}}Processor {
+	return &{{.Name}}Processor{
+		handler: handler,
+	}
+}
+
+// Invoke handles internal processing of {{title $.Name}} invocations.
+func (p *{{title .Name}}Processor) Invoke(ctx frugal.Context, method string, in frugal.Protocol) (frugal.Packer, error) {
+	switch method {
+	{{range .Methods -}}
+	case "{{lower .Name}}":
+		args := &{{$.Name}}{{title .Name}}Args{}
+		args.Unpack(in)
+		err := in.Err()
+		if err != nil {
+			return nil, err
+		}
+		res := &{{$.Name}}{{title .Name}}Result{}
+		res.Success, err = p.handler.{{title .Name}}(ctx{{range .Arguments}}, args.{{title .Name}}{{end}})
+		switch terr := err.(type) {
+		{{range .Exceptions -}}
+	case {{go .Type}}:
+			res.{{title .Name}} = terr
+			err = nil
+		{{end -}}
+		}
+		return res, err
+	{{end -}}
+	default:
+		return nil, errors.New("{{.Name}}: unsupported method " + method)
+	}
+}
 `
 
 // SetupGenerator initializes globals the generator needs, like the types file.
@@ -293,6 +359,12 @@ func (g *Generator) SetupGenerator(outputDir string) error {
 				Name: "success",
 				Type: t,
 			}, true)
+		},
+		"packSuccess": func(t *parser.Type) string {
+			return g.generateWriteFieldRec(&parser.Field{
+				Name: "success",
+				Type: t,
+			}, "p.")
 		},
 	}
 	g.structTPL, err = template.New("struct").Funcs(funcMap).Parse(structTemplate)
