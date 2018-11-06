@@ -14,7 +14,6 @@
 package gopherjs
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -32,32 +31,225 @@ import (
 )
 
 const (
-	lang                = "go"
+	lang                = "golang"
+	fileSuffix          = "go"
 	defaultOutputDir    = "gen-go"
 	serviceSuffix       = "_service"
 	scopeSuffix         = "_scope"
 	packagePrefixOption = "package_prefix"
-	thriftImportOption  = "thrift_import"
 	frugalImportOption  = "frugal_import"
-	useVendorOption     = "use_vendor"
-	slimOption          = "slim"
 )
 
 // Generator implements the LanguageGenerator interface for Go.
 type Generator struct {
 	*generator.BaseGenerator
-	generateConstants bool
-	typesFile         *os.File
+	typesFile  *os.File
+	structTPL  *template.Template
+	enumTPL    *template.Template
+	serviceTPL *template.Template
 }
 
 // NewGenerator creates a new Go LanguageGenerator.
 func NewGenerator(options map[string]string) generator.LanguageGenerator {
-	return &Generator{&generator.BaseGenerator{Options: options}, true, nil}
+	return &Generator{
+		BaseGenerator: &generator.BaseGenerator{Options: options},
+	}
 }
+
+var enumTemplate = `
+// {{title .Name}} is an enum.
+type {{title .Name}} int64
+
+// {{title .Name}} values.
+const (
+	{{range .Values -}}
+	{{title $.Name}}{{.Name}} {{title $.Name}} = {{.Value}}
+	{{end -}}
+)
+`
+
+const structTemplate = `
+// {{title .Name}} is a frual serializable object.
+type {{title .Name}} struct {
+	{{range .Fields -}}
+	{{title .Name}} {{fieldType .}}
+	{{end}}
+}
+
+// New{{title .Name}} constructs a {{title .Name}}.
+func New{{title .Name}}() *{{title .Name}} {
+	return &{{title .Name}}{
+		// TODO: default values
+		{{/*
+		func (g *Generator) generateConstructor(s *parser.Struct, sName string) string {
+			contents := ""
+
+			contents += fmt.Sprintf("func New%s() *%s {\n", sName, sName)
+			contents += fmt.Sprintf("\treturn &%s{\n", sName)
+
+			for _, field := range s.Fields {
+				// Use the default if it exists and it's not a pointer field, otherwise the zero value is implicitly used
+				if field.Default != nil && !g.isPointerField(field) {
+					val := g.generateConstantValue(field.Type, field.Default)
+					contents += fmt.Sprintf("\t\t%s: %s,\n", title(field.Name), val)
+				}
+			}
+
+			contents += "\t}\n"
+			contents += "}\n\n"
+			return contents
+		}
+		*/}}
+	}
+}
+
+// Unpack deserializes {{.Name}} objects.
+func (p *{{title .Name}}) Unpack(prot frugal.Protocol) {
+  prot.UnpackStructBegin("{{.Name}}")
+  for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
+    switch id {
+    {{range .Fields -}}
+    case {{.ID}}:
+      {{unpackField . -}}
+    {{end -}}
+    default:
+      prot.Skip(typeID)
+    }
+    prot.UnpackFieldEnd()
+  }
+  prot.UnpackStructEnd()
+}
+
+// Pack serializes {{.Name}} objects.
+func (p *{{title .Name}}) Pack(prot frugal.Protocol) {
+	{{if eq "union" .Type.String -}}
+	count := 0
+	{{range .Fields -}}
+		if p.{{title .Name}} != nil {
+			count++
+		}
+	{{end -}}
+	if count != 1 {
+		prot.Set(errors.New("{{.Name}} invalid union state"))
+		return
+	}
+	{{end -}}
+  prot.PackStructBegin("{{.Name}}")
+	{{range .Fields}}{{packField .}}{{end -}}
+	prot.PackFieldStop()
+  prot.PackStructEnd()
+}
+
+{{if eq "exception" .Type.String -}}
+func (p *{{title .Name}}) Error() string {
+	return "TODO: generate errorz"
+}
+{{end -}}
+`
+
+const serviceTemplate = `
+{{define "args"}}{{range .}}, {{.Name}} {{go .Type}}{{end}}{{end}}
+{{define "res"}}{{if .}}(r {{go .}}, err error){{else}}(err error){{end}}{{end}}
+{{define "func"}}{{title .Name}}(ctx frugal.Context{{template "args" .Arguments}}) {{template "res" .ReturnType}}{{end}}
+
+// {{title .Name}} is a service or a client.
+type {{title .Name}} interface {
+	{{range .Methods -}}
+	{{template "func" .}}
+	{{end -}}
+}
+
+// {{title .Name}}Client is the client.
+type {{title .Name}}Client struct {
+	call frugal.CallFunc
+}
+
+// New{{title .Name}}Client constructs a {{.Name}}Client.
+func New{{title .Name}}Client(cf frugal.CallFunc) *{{.Name}}Client {
+	return &{{.Name}}Client{
+		call: cf,
+	}
+}
+
+{{range .Methods -}}
+// {{title .Name}} calls a server.
+func (c *{{title $.Name}}Client) {{template "func" .}} {
+	args := &{{$.Name}}{{title .Name}}Args{
+		{{range .Arguments -}}
+		{{title .Name}}: {{.Name}},
+		{{end -}}
+	}
+	{{if .Oneway -}}
+		return c.call(ctx, "{{lower $.Name}}", "{{lower .Name}}", args, nil)
+	{{else -}}
+		res := &{{$.Name}}{{title .Name}}Result{}
+		err = c.call(ctx, "{{lower $.Name}}", "{{lower .Name}}", args, res)
+		if err != nil {
+			return
+		}
+		{{range .Exceptions -}}
+		if err = res.{{title .Name}}; err != nil {
+			return
+		}
+		{{end -}}
+		{{if .ReturnType -}}
+			return res.Success, nil
+		{{else -}}
+			return nil
+		{{end -}}
+	{{end -}}
+}
+
+// {{$.Name}}{{title .Name}}Args are the arguments to {{title .Name}} calls.
+type {{$.Name}}{{title .Name}}Args struct {
+	{{range .Arguments -}}
+	{{title .Name}} {{go .Type}}
+	{{end -}}
+}
+
+// Pack serializes {{$.Name}}{{title .Name}}Args objects.
+func (p *{{$.Name}}{{title .Name}}Args) Pack(prot frugal.Protocol) {
+  prot.PackStructBegin("{{$.Name}}{{title .Name}}Args")
+	{{range .Arguments}}{{packField .}}{{end -}}
+  prot.PackStructEnd()
+}
+
+{{if not .Oneway}}
+// {{$.Name}}{{title .Name}}Result is the response to {{title .Name}} calls.
+type {{$.Name}}{{title .Name}}Result struct {
+	{{if .ReturnType}}Success {{go .ReturnType}}{{end}}
+	{{range .Exceptions -}}
+	{{title .Name}} {{go .Type}}
+	{{end -}}
+}
+
+// Unpack deserializes {{$.Name}}{{title .Name}}Result objects.
+func (p *{{$.Name}}{{title .Name}}Result) Unpack(prot frugal.Protocol) {
+	prot.UnpackStructBegin("{{$.Name}}{{title .Name}}Result")
+	for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
+		switch id {
+		{{if .ReturnType -}}
+		case 0:
+			{{unpackSuccess .ReturnType -}}
+		{{end -}}
+		{{range .Exceptions -}}
+		case {{.ID}}:
+			{{unpackField . -}}
+		{{end -}}
+		default:
+			prot.Skip(typeID)
+		}
+		prot.UnpackFieldEnd()
+	}
+	prot.UnpackStructEnd()
+}
+{{end -}}
+
+{{end -}}
+`
 
 // SetupGenerator initializes globals the generator needs, like the types file.
 func (g *Generator) SetupGenerator(outputDir string) error {
-	g.generateConstants = true
 	t, err := g.GenerateFile("", outputDir, generator.TypeFile)
 	if err != nil {
 		return err
@@ -82,6 +274,39 @@ func (g *Generator) SetupGenerator(outputDir string) error {
 		return err
 	}
 
+	// Build out templates!
+	var funcMap = template.FuncMap{
+		"title": title,
+		"go":    g.getGoTypeFromThriftType,
+		"lower": parser.LowercaseFirstLetter,
+		"unpackField": func(field *parser.Field) string {
+			return g.generateReadFieldRec(field, true)
+		},
+		"fieldType": func(field *parser.Field) string {
+			return g.getGoTypeFromThriftTypePtr(field.Type, g.isPointerField(field))
+		},
+		"packField": func(field *parser.Field) string {
+			return g.generateWriteFieldRec(field, "p.")
+		},
+		"unpackSuccess": func(t *parser.Type) string {
+			return g.generateReadFieldRec(&parser.Field{
+				Name: "success",
+				Type: t,
+			}, true)
+		},
+	}
+	g.structTPL, err = template.New("struct").Funcs(funcMap).Parse(structTemplate)
+	if err != nil {
+		return err
+	}
+	g.enumTPL, err = template.New("enum").Funcs(funcMap).Parse(enumTemplate)
+	if err != nil {
+		return err
+	}
+	g.serviceTPL, err = template.New("service").Funcs(funcMap).Parse(serviceTemplate)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -129,15 +354,15 @@ func (g *Generator) GenerateDependencies(dir string) error {
 func (g *Generator) GenerateFile(name, outputDir string, fileType generator.FileType) (*os.File, error) {
 	switch fileType {
 	case generator.CombinedServiceFile:
-		return g.CreateFile(strings.ToLower(name)+serviceSuffix, outputDir, lang, true)
+		return g.CreateFile(strings.ToLower(name)+serviceSuffix, outputDir, fileSuffix, true)
 	case generator.CombinedScopeFile:
-		return g.CreateFile(strings.ToLower(name)+scopeSuffix, outputDir, lang, true)
+		return g.CreateFile(strings.ToLower(name)+scopeSuffix, outputDir, fileSuffix, true)
 	case generator.TypeFile:
-		return g.CreateFile("types", outputDir, lang, true)
+		return g.CreateFile("types", outputDir, fileSuffix, true)
 	case generator.ServiceArgsResultsFile:
-		return g.CreateFile(strings.ToLower(name), outputDir, lang, true)
+		return g.CreateFile(strings.ToLower(name), outputDir, fileSuffix, true)
 	default:
-		return nil, fmt.Errorf("Bad file type for golang generator: %s", fileType)
+		return nil, fmt.Errorf("Bad file type for gopherjs generator: %s", fileType)
 	}
 }
 
@@ -310,152 +535,24 @@ func (g *Generator) GenerateTypeDef(typedef *parser.TypeDef) error {
 	return err
 }
 
-var enumTemplate = `
-// {{title .Name}} is an enum.
-type {{title .Name}} int64
-
-// {{title .Name}} values.
-const (
-	{{range .Values -}}
-	{{title $.Name}}{{.Name}} {{title $.Name}} = {{.Value}}
-	{{end -}}
-)
-`
-
 // GenerateEnum generates the given enum.
 func (g *Generator) GenerateEnum(enum *parser.Enum) error {
-	// TODO: cache the template!
-	var funcMap = template.FuncMap{
-		"title": title,
-	}
-	var enumTemplate = template.Must(template.New("enum").Funcs(funcMap).Parse(enumTemplate))
-	return enumTemplate.Execute(g.typesFile, enum)
+	return g.enumTPL.Execute(g.typesFile, enum)
 }
 
 // GenerateStruct generates the given struct.
 func (g *Generator) GenerateStruct(s *parser.Struct) error {
-	contents := g.generateStruct(s)
-	_, err := g.typesFile.WriteString(contents)
-	return err
+	return g.structTPL.Execute(g.typesFile, s)
 }
 
 // GenerateUnion generates the given union.
 func (g *Generator) GenerateUnion(union *parser.Struct) error {
-	contents := g.generateStruct(union)
-	_, err := g.typesFile.WriteString(contents)
-	return err
+	return g.GenerateStruct(union)
 }
 
 // GenerateException generates the given exception.
 func (g *Generator) GenerateException(exception *parser.Struct) error {
-	contents := g.generateStruct(exception)
-	contents += fmt.Sprintf("func (p *%s) Error() string {\n", title(exception.Name))
-	contents += "\treturn \"TODO: generate error strings\"\n"
-	contents += "}\n"
-
-	_, err := g.typesFile.WriteString(contents)
-	return err
-}
-
-const structTemplate = `
-// {{title .Name}} is a frual serializable object.
-type {{title .Name}} struct {
-	{{range .Fields -}}
-	{{title .Name}} {{fieldType .}}
-	{{end}}
-}
-
-// New{{title .Name}} constructs a {{title .Name}}.
-func New{{title .Name}}() *{{title .Name}} {
-	return &{{title .Name}}{
-		// TODO: default values
-	}
-}
-
-// Unpack deserializes {{.Name}} objects.
-func (p *{{title .Name}}) Unpack(prot frugal.Protocol) {
-  prot.UnpackStructBegin("{{.Name}}")
-  for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
-    switch id {
-    {{range .Fields -}}
-    case {{.ID}}:
-      {{unpackField . -}}
-    {{end -}}
-    default:
-      prot.Skip(typeID)
-    }
-    prot.UnpackFieldEnd()
-  }
-  prot.UnpackStructEnd()
-}
-
-// Pack serializes {{.Name}} objects.
-func (p *{{title .Name}}) Pack(prot frugal.Protocol) {
-	{{if isUnion . -}}
-	// TODO: sanity check for unions
-	count := 0
-	{{range .Fields -}}
-		if p.{{title .Name}} != nil {
-			count++
-		}
-	{{end -}}
-	if count != 1 {
-		prot.Set(errors.New("{{.Name}} invalid union state"))
-		return
-	}
-	{{end -}}
-  prot.PackStructBegin("{{.Name}}")
-	{{range .Fields}}{{packField .}}{{end -}}
-	prot.PackFieldStop()
-  prot.PackStructEnd()
-}
-`
-
-func (g *Generator) generateStruct(s *parser.Struct) string {
-
-	// TODO: cache the template!
-	var funcMap = template.FuncMap{
-		"title": title,
-		"unpackField": func(field *parser.Field) string {
-			return g.generateReadFieldRec(field, true)
-		},
-		"fieldType": func(field *parser.Field) string {
-			return g.getGoTypeFromThriftTypePtr(field.Type, g.isPointerField(field))
-		},
-		"packField": func(field *parser.Field) string {
-			return g.generateWriteFieldRec(field, "p.")
-		},
-		"isUnion": func(s *parser.Struct) bool {
-			return s.Type == parser.StructTypeUnion
-		},
-	}
-	var readTemplate = template.Must(template.New("read").Funcs(funcMap).Parse(structTemplate))
-
-	// actually process the template
-	buff := bytes.NewBuffer(nil)
-	if err := readTemplate.Execute(buff, s); err != nil {
-		panic(err)
-	}
-	return buff.String()
-}
-
-func (g *Generator) generateConstructor(s *parser.Struct, sName string) string {
-	contents := ""
-
-	contents += fmt.Sprintf("func New%s() *%s {\n", sName, sName)
-	contents += fmt.Sprintf("\treturn &%s{\n", sName)
-
-	for _, field := range s.Fields {
-		// Use the default if it exists and it's not a pointer field, otherwise the zero value is implicitly used
-		if field.Default != nil && !g.isPointerField(field) {
-			val := g.generateConstantValue(field.Type, field.Default)
-			contents += fmt.Sprintf("\t\t%s: %s,\n", title(field.Name), val)
-		}
-	}
-
-	contents += "\t}\n"
-	contents += "}\n\n"
-	return contents
+	return g.GenerateStruct(exception)
 }
 
 func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string {
@@ -806,15 +903,6 @@ func (g *Generator) generateIncludeImport(include *parser.Include, pkgPrefix str
 
 // GenerateConstants generates any static constants.
 func (g *Generator) GenerateConstants(file *os.File, name string) error {
-	if !g.generateConstants {
-		return nil
-	}
-	constants := fmt.Sprintf("const delimiter = \"%s\"", globals.TopicDelimiter)
-	_, err := file.WriteString(constants)
-	if err != nil {
-		return err
-	}
-	g.generateConstants = false
 	return nil
 }
 
@@ -1106,131 +1194,9 @@ func (g *Generator) generateSubscribeMethod(scope *parser.Scope, op *parser.Oper
 	return subscriber
 }
 
-const serviceTemplate = `
-{{define "args"}}{{range .}}, {{.Name}} {{go .Type}}{{end}}{{end}}
-{{define "res"}}{{if .}}(r {{go .}}, err error){{else}}(err error){{end}}{{end}}
-{{define "func"}}{{title .Name}}(ctx frugal.Context{{template "args" .Arguments}}) {{template "res" .ReturnType}}{{end}}
-
-// {{title .Name}} is a service or a client.
-type {{title .Name}} interface {
-	{{range .Methods -}}
-	{{template "func" .}}
-	{{end -}}
-}
-
-// {{title .Name}}Client is the client.
-type {{title .Name}}Client struct {
-	call frugal.CallFunc
-}
-
-// New{{title .Name}}Client constructs a {{.Name}}Client.
-func New{{title .Name}}Client(cf frugal.CallFunc) *{{.Name}}Client {
-	return &{{.Name}}Client{
-		call: cf,
-	}
-}
-
-{{range .Methods -}}
-// {{title .Name}} calls a server.
-func (c *{{title $.Name}}Client) {{template "func" .}} {
-	args := &{{$.Name}}{{title .Name}}Args{
-		{{range .Arguments -}}
-		{{title .Name}}: {{.Name}},
-		{{end -}}
-	}
-	{{if .Oneway -}}
-		return c.call(ctx, "{{lower $.Name}}", "{{lower .Name}}", args, nil)
-	{{else -}}
-		res := &{{$.Name}}{{title .Name}}Result{}
-		err = c.call(ctx, "{{lower $.Name}}", "{{lower .Name}}", args, res)
-		if err != nil {
-			return
-		}
-		{{range .Exceptions -}}
-		if err = res.{{title .Name}}; err != nil {
-			return
-		}
-		{{end -}}
-		{{if .ReturnType -}}
-			return res.Success, nil
-		{{else -}}
-			return nil
-		{{end -}}
-	{{end -}}
-}
-
-// {{$.Name}}{{title .Name}}Args are the arguments to {{title .Name}} calls.
-type {{$.Name}}{{title .Name}}Args struct {
-	{{range .Arguments -}}
-	{{title .Name}} {{go .Type}}
-	{{end -}}
-}
-
-// Pack serializes {{$.Name}}{{title .Name}}Args objects.
-func (p *{{$.Name}}{{title .Name}}Args) Pack(prot frugal.Protocol) {
-  prot.PackStructBegin("{{$.Name}}{{title .Name}}Args")
-	{{range .Arguments}}{{packField .}}{{end -}}
-  prot.PackStructEnd()
-}
-
-{{if not .Oneway}}
-// {{$.Name}}{{title .Name}}Result is the response to {{title .Name}} calls.
-type {{$.Name}}{{title .Name}}Result struct {
-	{{if .ReturnType}}Success {{go .ReturnType}}{{end}}
-	{{range .Exceptions -}}
-	{{title .Name}} {{go .Type}}
-	{{end -}}
-}
-
-// Unpack deserializes {{$.Name}}{{title .Name}}Result objects.
-func (p *{{$.Name}}{{title .Name}}Result) Unpack(prot frugal.Protocol) {
-	prot.UnpackStructBegin("{{$.Name}}{{title .Name}}Result")
-	for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
-		switch id {
-		{{if .ReturnType -}}
-		case 0:
-			{{unpackSuccess .ReturnType -}}
-		{{end -}}
-		{{range .Exceptions -}}
-		case {{.ID}}:
-			{{unpackField . -}}
-		{{end -}}
-		default:
-			prot.Skip(typeID)
-		}
-		prot.UnpackFieldEnd()
-	}
-	prot.UnpackStructEnd()
-}
-{{end -}}
-
-{{end -}}
-`
-
 // GenerateService generates the given service.
 func (g *Generator) GenerateService(file *os.File, s *parser.Service) error {
-	// contents += g.generateServer(s)
-
-	// TODO: cache the template!
-	var funcMap = template.FuncMap{
-		"title": title,
-		"go":    g.getGoTypeFromThriftType,
-		"lower": parser.LowercaseFirstLetter,
-		"unpackField": func(field *parser.Field) string {
-			return g.generateReadFieldRec(field, true)
-		},
-		"packField": func(field *parser.Field) string {
-			return g.generateWriteFieldRec(field, "p.")
-		},
-		"unpackSuccess": func(t *parser.Type) string {
-			return g.generateReadFieldRec(&parser.Field{
-				Name: "success",
-				Type: t,
-			}, true)
-		},
-	}
-	var serviceTemplate = template.Must(template.New("service").Funcs(funcMap).Parse(serviceTemplate))
-	return serviceTemplate.Execute(file, s)
+	return g.serviceTPL.Execute(file, s)
 }
 
 func (g *Generator) getServiceExtendsNamespace(service *parser.Service) string {
@@ -1646,8 +1612,9 @@ func (g *Generator) qualifiedTypeName(t *parser.Type) string {
 	return param
 }
 
+// UseVendor determines if this editor supports use vendor.
 func (g *Generator) UseVendor() bool {
-	_, ok := g.Options[useVendorOption]
+	_, ok := g.Options["use_vendor"]
 	return ok
 }
 

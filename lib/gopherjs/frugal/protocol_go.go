@@ -9,6 +9,8 @@ import (
 )
 
 func newProtocol(buf []byte) *protocol {
+	thrift.NewTDeserializer() // what we will be replacing
+	thrift.NewTSerializer()   // what we will be replacing
 	pf := thrift.NewTCompactProtocolFactory()
 	trans := thrift.NewTMemoryBuffer()
 	trans.Write(buf)

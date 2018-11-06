@@ -1,5 +1,8 @@
 package frugal
 
+// TopicDelimiter is for topic splitting.
+const TopicDelimiter = "."
+
 // New constructs a new buffer
 func New(base []byte) Protocol {
 	return newProtocol(base)
