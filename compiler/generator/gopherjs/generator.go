@@ -180,7 +180,7 @@ func (g *Generator) GenerateConstantsContents(constants []*parser.Constant) erro
 	// Use a const expression for basic types and an init function for complex
 	// or typedef'd types
 	contents := ""
-	initfunc := "func init() {\n"
+	inits := []string{}
 
 	for _, constant := range constants {
 		if constant.Comment != nil {
@@ -195,20 +195,15 @@ func (g *Generator) GenerateConstantsContents(constants []*parser.Constant) erro
 			contents += fmt.Sprintf("const %s = %s\n\n", cName, value)
 		} else {
 			contents += fmt.Sprintf("var %s %s\n\n", cName, g.getGoTypeFromThriftType(constant.Type))
-			initfunc += fmt.Sprintf("\t%s = %s\n", cName, value)
+			inits = append(inits, fmt.Sprintf("\t%s = %s", cName, value))
 		}
 	}
 
-	initfunc += "}\n\n"
-	contents += initfunc
-
+	if len(inits) > 0 {
+		contents += "func init() {\n" + strings.Join(inits, "\n") + "\n}\n\n"
+	}
 	g.typesFile.WriteString(contents)
 	return nil
-}
-
-// quote creates a Go string literal for a string.
-func (g *Generator) quote(s string) string {
-	return strconv.Quote(s)
 }
 
 // generateConstantValue recursively generates the string representation of
@@ -247,7 +242,7 @@ func (g *Generator) generateConstantValue(t *parser.Type, value interface{}) str
 		case "bool", "i8", "byte", "i16", "i32", "i64", "double":
 			return fmt.Sprintf("%v", value)
 		case "string":
-			return g.quote(value.(string))
+			return strconv.Quote(value.(string))
 		case "binary":
 			return fmt.Sprintf("[]byte(\"%s\")", value)
 		case "list":
@@ -411,6 +406,7 @@ func (p *{{title .Name}}) Pack(prot frugal.Protocol) {
 	{{end -}}
   prot.PackStructBegin("{{.Name}}")
 	{{range .Fields}}{{packField .}}{{end -}}
+	prot.PackFieldStop()
   prot.PackStructEnd()
 }
 `
@@ -1292,7 +1288,7 @@ func (g *Generator) generateProcessor(service *parser.Service) string {
 		if len(method.Annotations) > 0 {
 			contents += fmt.Sprintf("\tp.AddToAnnotationsMap(\"%s\", map[string]string{\n", methodLower)
 			for _, annotation := range method.Annotations {
-				contents += fmt.Sprintf("\t\t\"%s\": %s,\n", annotation.Name, g.quote(annotation.Value))
+				contents += fmt.Sprintf("\t\t\"%s\": %s,\n", annotation.Name, strconv.Quote(annotation.Value))
 			}
 			contents += "\t})\n"
 		}
