@@ -21,7 +21,6 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
-	"unicode"
 
 	"golang.org/x/tools/imports"
 
@@ -1645,28 +1644,20 @@ func includeNameToReference(includeName string) string {
 	return split[len(split)-1]
 }
 
-// snakeToCamel returns a string converted from snake case to uppercase.
+// snakeToCamel returns a string converted from snake case to titlecase.
 func snakeToCamel(s string) string {
 	if len(s) == 0 {
 		return s
 	}
-
-	var result string
-
 	words := strings.Split(s, "_")
-
-	for _, word := range words {
+	for i, word := range words {
 		if upper := strings.ToUpper(word); commonInitialisms[upper] {
-			result += upper
-			continue
+			words[i] = upper
+		} else {
+			words[i] = strings.Title(word)
 		}
-
-		w := []rune(word)
-		w[0] = unicode.ToUpper(w[0])
-		result += string(w)
 	}
-
-	return result
+	return strings.Join(words, "")
 }
 
 func title(name string) string {
