@@ -2,3 +2,19 @@
 // DO NOT EDIT UNLESS YOU ARE SURE THAT YOU KNOW WHAT YOU ARE DOING
 
 package variety
+
+import (
+	"github.com/Workiva/frugal/lib/gopherjs/frugal"
+)
+
+// EventsPublisher enables publishing Events events.
+type EventsPublisher interface {
+	Open() error
+	Close() error
+	PublishEventCreated(ctx frugal.Context, user string, req *Event) error
+	PublishSomeInt(ctx frugal.Context, user string, req int64) error
+	PublishSomeStr(ctx frugal.Context, user string, req string) error
+	PublishSomeList(ctx frugal.Context, user string, req []map[ID]*Event) error
+}
+
+// Doing wicket subscribe template stuff.

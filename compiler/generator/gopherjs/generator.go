@@ -32,7 +32,7 @@ import (
 const (
 	lang                = "golang"
 	fileSuffix          = "go"
-	defaultOutputDir    = "gen-go"
+	defaultOutputDir    = "gen-golang"
 	serviceSuffix       = "_service"
 	scopeSuffix         = "_scope"
 	packagePrefixOption = "package_prefix"
@@ -42,10 +42,12 @@ const (
 // Generator implements the LanguageGenerator interface for Go.
 type Generator struct {
 	*generator.BaseGenerator
-	typesFile  *os.File
-	structTPL  *template.Template
-	enumTPL    *template.Template
-	serviceTPL *template.Template
+	typesFile    *os.File
+	structTPL    *template.Template
+	enumTPL      *template.Template
+	serviceTPL   *template.Template
+	publishTPL   *template.Template
+	subscribeTPL *template.Template
 }
 
 // NewGenerator creates a new Go LanguageGenerator.
@@ -254,6 +256,23 @@ func (p *{{title .Name}}Processor) Invoke(ctx frugal.Context, method string, in 
 }
 `
 
+const publishTemplate = `
+{{define "args"}}{{range .Prefix.Variables}}{{.}} string, {{end}}{{end}}
+
+// {{title .Name}}Publisher enables publishing {{title .Name}} events.
+type {{title .Name}}Publisher interface {
+	Open() error
+	Close() error
+	{{range .Operations -}}
+		Publish{{title .Name}}(ctx frugal.Context, {{template "args" $}}req {{go .Type}}) error
+	{{end -}}
+}
+`
+
+const subscribeTemplate = `
+// Doing wicket subscribe template stuff.
+`
+
 // SetupGenerator initializes globals the generator needs, like the types file.
 func (g *Generator) SetupGenerator(outputDir string) error {
 	t, err := g.GenerateFile("", outputDir, generator.TypeFile)
@@ -305,6 +324,14 @@ func (g *Generator) SetupGenerator(outputDir string) error {
 		return err
 	}
 	g.serviceTPL, err = template.New("service").Funcs(funcMap).Parse(serviceTemplate)
+	if err != nil {
+		return err
+	}
+	g.publishTPL, err = template.New("publish").Funcs(funcMap).Parse(publishTemplate)
+	if err != nil {
+		return err
+	}
+	g.subscribeTPL, err = template.New("subscribe").Funcs(funcMap).Parse(subscribeTemplate)
 	if err != nil {
 		return err
 	}
@@ -778,49 +805,34 @@ func (g *Generator) generateWriteFieldRec(field *parser.Field, prefix string) st
 
 // GenerateTypesImports generates the necessary Go types imports.
 func (g *Generator) GenerateTypesImports(file *os.File) error {
-	contents := "import (\n"
-	if g.Options[frugalImportOption] != "" {
-		contents += "\t\"" + g.Options[frugalImportOption] + "\"\n"
-	} else {
-		contents += "\t\"github.com/Workiva/frugal/lib/gopherjs/frugal\"\n"
-	}
-
-	pkgPrefix := g.Options[packagePrefixOption]
-	for _, include := range g.Frugal.Includes {
-		imp, err := g.generateIncludeImport(include, pkgPrefix)
-		if err != nil {
-			return err
-		}
-		contents += imp
-	}
-
-	contents += ")\n\n"
-	_, err := file.WriteString(contents)
-	return err
+	return g.generateImports(file, g.Frugal.Includes)
 }
 
 // GenerateServiceResultArgsImports generates the necessary imports for service
 // args and result types.
 func (g *Generator) GenerateServiceResultArgsImports(file *os.File) error {
-	contents := "import (\n"
-
-	pkgPrefix := g.Options[packagePrefixOption]
-	for _, include := range g.Frugal.Includes {
-		if imp, err := g.generateIncludeImport(include, pkgPrefix); err != nil {
-			return err
-		} else {
-			contents += imp
-		}
-	}
-
-	contents += ")\n\n"
-
-	_, err := file.WriteString(contents)
-	return err
+	return g.generateImports(file, g.Frugal.Includes)
 }
 
 // GenerateServiceImports generates necessary imports for the given service.
 func (g *Generator) GenerateServiceImports(file *os.File, s *parser.Service) error {
+	includes, err := s.ReferencedIncludes()
+	if err != nil {
+		return err
+	}
+	return g.generateImports(file, includes)
+}
+
+// GenerateScopeImports generates necessary imports for the given scope.
+func (g *Generator) GenerateScopeImports(file *os.File, s *parser.Scope) error {
+	scopeIncludes, err := g.Frugal.ReferencedScopeIncludes()
+	if err != nil {
+		return err
+	}
+	return g.generateImports(file, scopeIncludes)
+}
+
+func (g *Generator) generateImports(file *os.File, includes []*parser.Include) error {
 	imports := "import (\n"
 	if g.Options[frugalImportOption] != "" {
 		imports += "\t\"" + g.Options[frugalImportOption] + "\"\n"
@@ -829,49 +841,14 @@ func (g *Generator) GenerateServiceImports(file *os.File, s *parser.Service) err
 	}
 
 	pkgPrefix := g.Options[packagePrefixOption]
-	includes, err := s.ReferencedIncludes()
-	if err != nil {
-		return err
-	}
 	for _, include := range includes {
-		if imp, err := g.generateIncludeImport(include, pkgPrefix); err != nil {
+		imp, err := g.generateIncludeImport(include, pkgPrefix)
+		if err != nil {
 			return err
-		} else {
-			imports += imp
 		}
+		imports += imp
 	}
-
-	imports += ")\n\n"
-
-	_, err = file.WriteString(imports)
-	return err
-}
-
-// GenerateScopeImports generates necessary imports for the given scope.
-func (g *Generator) GenerateScopeImports(file *os.File, s *parser.Scope) error {
-	imports := "import (\n"
-	if g.Options[frugalImportOption] != "" {
-		imports += "\t\"" + g.Options[frugalImportOption] + "\"\n"
-	} else {
-		imports += "\t\"github.com/Workiva/frugal/lib/go\"\n"
-	}
-
-	pkgPrefix := g.Options[packagePrefixOption]
-	scopeIncludes, err := g.Frugal.ReferencedScopeIncludes()
-	if err != nil {
-		return err
-	}
-	for _, include := range scopeIncludes {
-		if imp, err := g.generateIncludeImport(include, pkgPrefix); err != nil {
-			return err
-		} else {
-			imports += imp
-		}
-	}
-
-	imports += ")"
-
-	_, err = file.WriteString(imports)
+	_, err := file.WriteString(imports + ")")
 	return err
 }
 
@@ -911,7 +888,7 @@ func (g *Generator) GenerateConstants(file *os.File, name string) error {
 
 // GeneratePublisher generates the publisher for the given scope.
 func (g *Generator) GeneratePublisher(file *os.File, scope *parser.Scope) error {
-	return nil
+	return g.publishTPL.Execute(file, scope)
 	// var (
 	// 	scopeLower = parser.LowercaseFirstLetter(scope.Name)
 	// 	scopeCamel = snakeToCamel(scope.Name)
@@ -1065,7 +1042,7 @@ func generatePrefixStringTemplate(scope *parser.Scope) string {
 
 // GenerateSubscriber generates the subscriber for the given scope.
 func (g *Generator) GenerateSubscriber(file *os.File, scope *parser.Scope) error {
-	return nil
+	return g.subscribeTPL.Execute(file, scope)
 	// var (
 	// 	scopeLower = parser.LowercaseFirstLetter(scope.Name)
 	// 	scopeCamel = snakeToCamel(scope.Name)
