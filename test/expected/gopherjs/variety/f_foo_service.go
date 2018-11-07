@@ -70,7 +70,7 @@ func (c *FooClient) Blah(ctx frugal.Context, num int32, Str string, event *Event
 	if err = res.API; err != nil {
 		return
 	}
-	return res.Success, nil
+	return *res.Success, nil
 }
 
 // OneWay calls a server.
@@ -111,7 +111,7 @@ func (c *FooClient) ParamModifiers(ctx frugal.Context, opt_num int32, default_nu
 	if err != nil {
 		return
 	}
-	return res.Success, nil
+	return *res.Success, nil
 }
 
 // UnderlyingTypesTest calls a server.
@@ -147,7 +147,7 @@ func (c *FooClient) GetMyInt(ctx frugal.Context) (r ValidTypes.MyInt, err error)
 	if err != nil {
 		return
 	}
-	return res.Success, nil
+	return *res.Success, nil
 }
 
 // UseSubdirStruct calls a server.
@@ -173,7 +173,7 @@ func (c *FooClient) SayHelloWith(ctx frugal.Context, newMessage string) (r strin
 	if err != nil {
 		return
 	}
-	return res.Success, nil
+	return *res.Success, nil
 }
 
 // WhatDoYouSay calls a server.
@@ -186,7 +186,7 @@ func (c *FooClient) WhatDoYouSay(ctx frugal.Context, messageArgs string) (r stri
 	if err != nil {
 		return
 	}
-	return res.Success, nil
+	return *res.Success, nil
 }
 
 // SayAgain calls a server.
@@ -199,7 +199,7 @@ func (c *FooClient) SayAgain(ctx frugal.Context, messageResult string) (r string
 	if err != nil {
 		return
 	}
-	return res.Success, nil
+	return *res.Success, nil
 }
 
 // FooProcessor is the client.
@@ -235,7 +235,11 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 			return nil, err
 		}
 		res := &FooBlahResult{}
-		res.Success, err = p.handler.Blah(ctx, args.Num, args.Str, args.Event)
+		var raw int64
+		raw, err = p.handler.Blah(ctx, args.Num, args.Str, args.Event)
+		if err != nil {
+			res.Success = &raw
+		}
 		switch terr := err.(type) {
 		case *AwesomeException:
 			res.Awe = terr
@@ -252,9 +256,7 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 		if err != nil {
 			return nil, err
 		}
-		res := &FooOneWayResult{}
-		err = p.handler.OneWay(ctx, args.ID, args.Req)
-		return res, err
+		return nil, p.handler.OneWay(ctx, args.ID, args.Req)
 	case "bin_method":
 		args := &FooBinMethodArgs{}
 		args.Unpack(in)
@@ -278,7 +280,11 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 			return nil, err
 		}
 		res := &FooParamModifiersResult{}
-		res.Success, err = p.handler.ParamModifiers(ctx, args.OptNum, args.DefaultNum, args.ReqNum)
+		var raw int64
+		raw, err = p.handler.ParamModifiers(ctx, args.OptNum, args.DefaultNum, args.ReqNum)
+		if err != nil {
+			res.Success = &raw
+		}
 		return res, err
 	case "underlying_types_test":
 		args := &FooUnderlyingTypesTestArgs{}
@@ -308,7 +314,11 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 			return nil, err
 		}
 		res := &FooGetMyIntResult{}
-		res.Success, err = p.handler.GetMyInt(ctx)
+		var raw ValidTypes.MyInt
+		raw, err = p.handler.GetMyInt(ctx)
+		if err != nil {
+			res.Success = &raw
+		}
 		return res, err
 	case "use_subdir_struct":
 		args := &FooUseSubdirStructArgs{}
@@ -328,7 +338,11 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 			return nil, err
 		}
 		res := &FooSayHelloWithResult{}
-		res.Success, err = p.handler.SayHelloWith(ctx, args.NewMessage)
+		var raw string
+		raw, err = p.handler.SayHelloWith(ctx, args.NewMessage)
+		if err != nil {
+			res.Success = &raw
+		}
 		return res, err
 	case "whatDoYouSay":
 		args := &FooWhatDoYouSayArgs{}
@@ -338,7 +352,11 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 			return nil, err
 		}
 		res := &FooWhatDoYouSayResult{}
-		res.Success, err = p.handler.WhatDoYouSay(ctx, args.MessageArgs)
+		var raw string
+		raw, err = p.handler.WhatDoYouSay(ctx, args.MessageArgs)
+		if err != nil {
+			res.Success = &raw
+		}
 		return res, err
 	case "sayAgain":
 		args := &FooSayAgainArgs{}
@@ -348,7 +366,11 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 			return nil, err
 		}
 		res := &FooSayAgainResult{}
-		res.Success, err = p.handler.SayAgain(ctx, args.MessageResult)
+		var raw string
+		raw, err = p.handler.SayAgain(ctx, args.MessageResult)
+		if err != nil {
+			res.Success = &raw
+		}
 		return res, err
 	default:
 		return nil, errors.New("Foo: unsupported method " + method)

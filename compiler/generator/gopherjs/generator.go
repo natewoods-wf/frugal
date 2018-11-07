@@ -193,7 +193,7 @@ func (c *{{title $.Name}}Client) {{template "func" .}} {
 		}
 		{{end -}}
 		{{if .ReturnType -}}
-			return res.Success, nil
+			return {{if prim .ReturnType}}*{{end}}res.Success, nil
 		{{else -}}
 			return nil
 		{{end -}}
@@ -224,18 +224,30 @@ func (p *{{title .Name}}Processor) Invoke(ctx frugal.Context, method string, in 
 		if err != nil {
 			return nil, err
 		}
-		res := &{{$.Name}}{{title .Name}}Result{}
-		{{if .ReturnType}}res.Success, {{end}}err = p.handler.{{title .Name}}(ctx{{range .Arguments}}, args.{{title .Name}}{{end}})
-		{{if .Exceptions -}}
-		switch terr := err.(type) {
-		{{range .Exceptions -}}
-	case {{go .Type}}:
-			res.{{title .Name}} = terr
-			err = nil
+		{{if .Oneway -}}
+			return nil, p.handler.{{title .Name}}(ctx{{range .Arguments}}, args.{{title .Name}}{{end}})
+		{{else -}}
+			res := &{{$.Name}}{{title .Name}}Result{}
+			{{if prim .ReturnType -}}
+				var raw {{go .ReturnType}}
+				raw, err = p.handler.{{title .Name}}(ctx{{range .Arguments}}, args.{{title .Name}}{{end}})
+				if err != nil {
+					res.Success = &raw
+				}
+			{{else -}}
+				{{if .ReturnType}}res.Success, {{end}}err = p.handler.{{title .Name}}(ctx{{range .Arguments}}, args.{{title .Name}}{{end}})
+			{{end -}}
+			{{if .Exceptions -}}
+			switch terr := err.(type) {
+			{{range .Exceptions -}}
+			case {{go .Type}}:
+				res.{{title .Name}} = terr
+				err = nil
+			{{end -}}
+			}
+			{{end -}}
+			return res, err
 		{{end -}}
-		}
-		{{end -}}
-		return res, err
 	{{end -}}
 	default:
 		return nil, errors.New("{{.Name}}: unsupported method " + method)
@@ -274,6 +286,7 @@ func (g *Generator) SetupGenerator(outputDir string) error {
 		"title": title,
 		"go":    g.getGoTypeFromThriftType,
 		"lower": parser.LowercaseFirstLetter,
+		"prim":  g.isPrimitive,
 		"unpackField": func(field *parser.Field) string {
 			return g.generateReadFieldRec(field, true)
 		},
@@ -1549,6 +1562,9 @@ func (g *Generator) getEnumFromThriftType(t *parser.Type) string {
 }
 
 func (g *Generator) isPrimitive(t *parser.Type) bool {
+	if t == nil {
+		return false
+	}
 	underlyingType := g.Frugal.UnderlyingType(t)
 	switch underlyingType.Name {
 	case "bool", "byte", "i8", "i16", "i32", "i64", "double", "string":
