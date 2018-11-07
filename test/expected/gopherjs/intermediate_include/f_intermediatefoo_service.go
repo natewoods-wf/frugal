@@ -60,9 +60,7 @@ func (p *IntermediateFooProcessor) Invoke(ctx frugal.Context, method string, in 
 			return nil, err
 		}
 		res := &IntermediateFooIntermeidateFooResult{}
-		res.Success, err = p.handler.IntermeidateFoo(ctx)
-		switch terr := err.(type) {
-		}
+		err = p.handler.IntermeidateFoo(ctx)
 		return res, err
 	default:
 		return nil, errors.New("IntermediateFoo: unsupported method " + method)

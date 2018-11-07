@@ -74,12 +74,14 @@ func (b *BaseGenerator) SetFrugal(f *parser.Frugal) {
 	b.Frugal = f
 }
 
+// GetElem generates a unique variable name.
 func (b *BaseGenerator) GetElem() string {
 	s := fmt.Sprintf("elem%d", b.elemNum)
 	b.elemNum++
 	return s
 }
 
+// GetServiceMethodTypes generates the method types for a given service.
 func (b *BaseGenerator) GetServiceMethodTypes(service *parser.Service) []*parser.Struct {
 	structs := []*parser.Struct{}
 	for _, method := range service.Methods {

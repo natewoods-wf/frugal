@@ -60,9 +60,7 @@ func (p *BaseFooProcessor) Invoke(ctx frugal.Context, method string, in frugal.P
 			return nil, err
 		}
 		res := &BaseFooBasePingResult{}
-		res.Success, err = p.handler.BasePing(ctx)
-		switch terr := err.(type) {
-		}
+		err = p.handler.BasePing(ctx)
 		return res, err
 	default:
 		return nil, errors.New("BaseFoo: unsupported method " + method)

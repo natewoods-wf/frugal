@@ -60,9 +60,7 @@ func (p *FooTransitiveDepsProcessor) Invoke(ctx frugal.Context, method string, i
 			return nil, err
 		}
 		res := &FooTransitiveDepsPingResult{}
-		res.Success, err = p.handler.Ping(ctx)
-		switch terr := err.(type) {
-		}
+		err = p.handler.Ping(ctx)
 		return res, err
 	default:
 		return nil, errors.New("FooTransitiveDeps: unsupported method " + method)

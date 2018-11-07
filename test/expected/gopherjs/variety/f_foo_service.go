@@ -225,9 +225,7 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 			return nil, err
 		}
 		res := &FooPingResult{}
-		res.Success, err = p.handler.Ping(ctx)
-		switch terr := err.(type) {
-		}
+		err = p.handler.Ping(ctx)
 		return res, err
 	case "blah":
 		args := &FooBlahArgs{}
@@ -255,9 +253,7 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 			return nil, err
 		}
 		res := &FooOneWayResult{}
-		res.Success, err = p.handler.OneWay(ctx, args.ID, args.Req)
-		switch terr := err.(type) {
-		}
+		err = p.handler.OneWay(ctx, args.ID, args.Req)
 		return res, err
 	case "bin_method":
 		args := &FooBinMethodArgs{}
@@ -283,8 +279,6 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 		}
 		res := &FooParamModifiersResult{}
 		res.Success, err = p.handler.ParamModifiers(ctx, args.OptNum, args.DefaultNum, args.ReqNum)
-		switch terr := err.(type) {
-		}
 		return res, err
 	case "underlying_types_test":
 		args := &FooUnderlyingTypesTestArgs{}
@@ -295,8 +289,6 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 		}
 		res := &FooUnderlyingTypesTestResult{}
 		res.Success, err = p.handler.UnderlyingTypesTest(ctx, args.ListType, args.SetType)
-		switch terr := err.(type) {
-		}
 		return res, err
 	case "getThing":
 		args := &FooGetThingArgs{}
@@ -307,8 +299,6 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 		}
 		res := &FooGetThingResult{}
 		res.Success, err = p.handler.GetThing(ctx)
-		switch terr := err.(type) {
-		}
 		return res, err
 	case "getMyInt":
 		args := &FooGetMyIntArgs{}
@@ -319,8 +309,6 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 		}
 		res := &FooGetMyIntResult{}
 		res.Success, err = p.handler.GetMyInt(ctx)
-		switch terr := err.(type) {
-		}
 		return res, err
 	case "use_subdir_struct":
 		args := &FooUseSubdirStructArgs{}
@@ -331,8 +319,6 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 		}
 		res := &FooUseSubdirStructResult{}
 		res.Success, err = p.handler.UseSubdirStruct(ctx, args.A)
-		switch terr := err.(type) {
-		}
 		return res, err
 	case "sayHelloWith":
 		args := &FooSayHelloWithArgs{}
@@ -343,8 +329,6 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 		}
 		res := &FooSayHelloWithResult{}
 		res.Success, err = p.handler.SayHelloWith(ctx, args.NewMessage)
-		switch terr := err.(type) {
-		}
 		return res, err
 	case "whatDoYouSay":
 		args := &FooWhatDoYouSayArgs{}
@@ -355,8 +339,6 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 		}
 		res := &FooWhatDoYouSayResult{}
 		res.Success, err = p.handler.WhatDoYouSay(ctx, args.MessageArgs)
-		switch terr := err.(type) {
-		}
 		return res, err
 	case "sayAgain":
 		args := &FooSayAgainArgs{}
@@ -367,8 +349,6 @@ func (p *FooProcessor) Invoke(ctx frugal.Context, method string, in frugal.Proto
 		}
 		res := &FooSayAgainResult{}
 		res.Success, err = p.handler.SayAgain(ctx, args.MessageResult)
-		switch terr := err.(type) {
-		}
 		return res, err
 	default:
 		return nil, errors.New("Foo: unsupported method " + method)

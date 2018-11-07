@@ -225,7 +225,8 @@ func (p *{{title .Name}}Processor) Invoke(ctx frugal.Context, method string, in 
 			return nil, err
 		}
 		res := &{{$.Name}}{{title .Name}}Result{}
-		res.Success, err = p.handler.{{title .Name}}(ctx{{range .Arguments}}, args.{{title .Name}}{{end}})
+		{{if .ReturnType}}res.Success, {{end}}err = p.handler.{{title .Name}}(ctx{{range .Arguments}}, args.{{title .Name}}{{end}})
+		{{if .Exceptions -}}
 		switch terr := err.(type) {
 		{{range .Exceptions -}}
 	case {{go .Type}}:
@@ -233,6 +234,7 @@ func (p *{{title .Name}}Processor) Invoke(ctx frugal.Context, method string, in 
 			err = nil
 		{{end -}}
 		}
+		{{end -}}
 		return res, err
 	{{end -}}
 	default:
