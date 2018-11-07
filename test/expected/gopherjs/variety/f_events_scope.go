@@ -9,12 +9,37 @@ import (
 
 // EventsPublisher enables publishing Events events.
 type EventsPublisher interface {
-	Open() error
-	Close() error
 	PublishEventCreated(ctx frugal.Context, user string, req *Event) error
 	PublishSomeInt(ctx frugal.Context, user string, req int64) error
 	PublishSomeStr(ctx frugal.Context, user string, req string) error
 	PublishSomeList(ctx frugal.Context, user string, req []map[ID]*Event) error
+}
+
+type eventsPublisher struct {
+	call frugal.CallFunc
+}
+
+// NewEventsPublisher creates a new publisher.
+func NewEventsPublisher(call frugal.CallFunc) EventsPublisher {
+	return &eventsPublisher{
+		call: call,
+	}
+}
+
+func (p *eventsPublisher) PublishEventCreated(ctx frugal.Context, user string, req *Event) error {
+	return p.call(ctx, "foo."+user+".Events", "EventCreated", req, nil)
+}
+
+func (p *eventsPublisher) PublishSomeInt(ctx frugal.Context, user string, req int64) error {
+	return p.call(ctx, "foo."+user+".Events", "SomeInt", req, nil)
+}
+
+func (p *eventsPublisher) PublishSomeStr(ctx frugal.Context, user string, req string) error {
+	return p.call(ctx, "foo."+user+".Events", "SomeStr", req, nil)
+}
+
+func (p *eventsPublisher) PublishSomeList(ctx frugal.Context, user string, req []map[ID]*Event) error {
+	return p.call(ctx, "foo."+user+".Events", "SomeList", req, nil)
 }
 
 // Doing wicket subscribe template stuff.

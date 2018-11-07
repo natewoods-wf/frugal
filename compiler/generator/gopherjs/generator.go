@@ -261,12 +261,27 @@ const publishTemplate = `
 
 // {{title .Name}}Publisher enables publishing {{title .Name}} events.
 type {{title .Name}}Publisher interface {
-	Open() error
-	Close() error
 	{{range .Operations -}}
 		Publish{{title .Name}}(ctx frugal.Context, {{template "args" $}}req {{go .Type}}) error
 	{{end -}}
 }
+
+type {{lower .Name}}Publisher struct {
+	call frugal.CallFunc
+}
+
+// New{{title .Name}}Publisher creates a new publisher.
+func New{{title .Name}}Publisher(call frugal.CallFunc) {{title .Name}}Publisher {
+	return &{{lower .Name}}Publisher{
+		call: call,
+	}
+}
+
+{{range .Operations}}
+func (p *{{lower $.Name}}Publisher) Publish{{title .Name}}(ctx frugal.Context, {{template "args" $}}req {{go .Type}}) error {
+	return p.call(ctx, "{{if $.Prefix}}{{$.Prefix.String}}.{{end}}{{$.Name}}", "{{.Name}}", req, nil)
+}
+{{end}}
 `
 
 const subscribeTemplate = `
@@ -854,7 +869,7 @@ func (g *Generator) generateImports(file *os.File, includes []*parser.Include) e
 
 func (g *Generator) generateIncludeImport(include *parser.Include, pkgPrefix string) (string, error) {
 	includeName := filepath.Base(include.Name)
-	importPath := fmt.Sprintf("%s%s", pkgPrefix, includeNameToImport(includeName))
+	importPath := pkgPrefix + includeNameToImport(includeName)
 	namespace := g.Frugal.NamespaceForInclude(includeName, lang)
 
 	_, vendored := include.Annotations.Vendor()
@@ -862,7 +877,7 @@ func (g *Generator) generateIncludeImport(include *parser.Include, pkgPrefix str
 	vendorPath := ""
 
 	if namespace != nil {
-		importPath = fmt.Sprintf("%s%s", pkgPrefix, includeNameToImport(namespace.Value))
+		importPath = pkgPrefix + includeNameToImport(namespace.Value)
 		if nsVendorPath, ok := namespace.Annotations.Vendor(); ok {
 			vendorPath = nsVendorPath
 		}
@@ -888,137 +903,9 @@ func (g *Generator) GenerateConstants(file *os.File, name string) error {
 
 // GeneratePublisher generates the publisher for the given scope.
 func (g *Generator) GeneratePublisher(file *os.File, scope *parser.Scope) error {
+	scope.Prefix.String = strings.Replace(scope.Prefix.String, "{", `"+`, len(scope.Prefix.Variables))
+	scope.Prefix.String = strings.Replace(scope.Prefix.String, "}", `+"`, len(scope.Prefix.Variables))
 	return g.publishTPL.Execute(file, scope)
-	// var (
-	// 	scopeLower = parser.LowercaseFirstLetter(scope.Name)
-	// 	scopeCamel = snakeToCamel(scope.Name)
-	// 	publisher  = ""
-	// )
-	//
-	// if scope.Comment != nil {
-	// 	publisher += g.GenerateInlineComment(scope.Comment, "")
-	// }
-	// args := ""
-	// if len(scope.Prefix.Variables) > 0 {
-	// 	prefix := ""
-	// 	for _, variable := range scope.Prefix.Variables {
-	// 		args += prefix + variable
-	// 		prefix = ", "
-	// 	}
-	// 	args += " string, "
-	// }
-	//
-	// publisher += fmt.Sprintf("type %sPublisher interface {\n", scopeCamel)
-	// publisher += "\tOpen() error\n"
-	// publisher += "\tClose() error\n"
-	// for _, op := range scope.Operations {
-	// 	publisher += fmt.Sprintf("\tPublish%s(ctx frugal.Context, %sreq %s) error\n", op.Name, args, g.getGoTypeFromThriftType(op.Type))
-	// }
-	// publisher += "}\n\n"
-	//
-	// publisher += fmt.Sprintf("type %sPublisher struct {\n", scopeLower)
-	// publisher += "\ttransport frugal.FPublisherTransport\n"
-	// publisher += "\tprotocolFactory *frugal.FProtocolFactory\n"
-	// publisher += "\tmethods   map[string]*frugal.Method\n"
-	// publisher += "}\n\n"
-	//
-	// publisher += fmt.Sprintf("func New%sPublisher(provider *frugal.FScopeProvider, middleware ...frugal.ServiceMiddleware) %sPublisher {\n",
-	// 	scopeCamel, scopeCamel)
-	// publisher += "\ttransport, protocolFactory := provider.NewPublisher()\n"
-	// publisher += "\tmethods := make(map[string]*frugal.Method)\n"
-	// publisher += fmt.Sprintf("\tpublisher := &%sPublisher{\n", scopeLower)
-	// publisher += "\t\ttransport: transport,\n"
-	// publisher += "\t\tprotocolFactory:  protocolFactory,\n"
-	// publisher += "\t\tmethods:   methods,\n"
-	// publisher += "\t}\n"
-	// publisher += "\tmiddleware = append(middleware, provider.GetMiddleware()...)\n"
-	// for _, op := range scope.Operations {
-	// 	publisher += fmt.Sprintf("\tmethods[\"publish%s\"] = frugal.NewMethod(publisher, publisher.publish%s, \"publish%s\", middleware)\n",
-	// 		op.Name, op.Name, op.Name)
-	// }
-	// publisher += "\treturn publisher\n"
-	// publisher += "}\n\n"
-	//
-	// publisher += fmt.Sprintf("func (p *%sPublisher) Open() error {\n", scopeLower)
-	//
-	// publisher += "\treturn p.transport.Open()\n"
-	// publisher += "}\n\n"
-	//
-	// publisher += fmt.Sprintf("func (p *%sPublisher) Close() error {\n", scopeLower)
-	// publisher += "\treturn p.transport.Close()\n"
-	// publisher += "}\n\n"
-	//
-	// prefix := ""
-	// for _, op := range scope.Operations {
-	// 	publisher += prefix
-	// 	prefix = "\n\n"
-	// 	publisher += g.generatePublishMethod(scope, op, args)
-	// }
-	//
-	// _, err := file.WriteString(publisher)
-	// return err
-}
-
-func (g *Generator) generatePublishMethod(scope *parser.Scope, op *parser.Operation, args string) string {
-	var (
-		// scopeLower = parser.LowercaseFirstLetter(scope.Name)
-		publisher = ""
-	)
-
-	// 	if op.Comment != nil {
-	// 		publisher += g.GenerateInlineComment(op.Comment, "")
-	// 	}
-	//
-	// 	publisher += fmt.Sprintf("func (p *%sPublisher) Publish%s(ctx frugal.Context, %sreq %s) error {\n",
-	// 		scopeLower, op.Name, args, g.getGoTypeFromThriftType(op.Type))
-	// 	publisher += fmt.Sprintf("\tret := p.methods[\"publish%s\"].Invoke(%s)\n", op.Name, g.generateScopeArgs(scope))
-	// 	publisher += "\tif ret[0] != nil {\n"
-	// 	publisher += "\t\treturn ret[0].(error)\n"
-	// 	publisher += "\t}\n"
-	// 	publisher += "\treturn nil\n"
-	// 	publisher += "}\n\n"
-	//
-	// 	publisher += g.generateInternalPublishMethod(scope, op, args)
-	//
-	// 	return publisher
-	// }
-	//
-	// func (g *Generator) generateInternalPublishMethod(scope *parser.Scope, op *parser.Operation, args string) string {
-	// 	var (
-	// 		scopeLower = parser.LowercaseFirstLetter(scope.Name)
-	// 		scopeTitle = strings.Title(scope.Name)
-	// 		publisher  = ""
-	// 	)
-	//
-	// 	publisher += fmt.Sprintf("func (p *%sPublisher) publish%s(ctx frugal.Context, %sreq %s) error {\n",
-	// 		scopeLower, op.Name, args, g.getGoTypeFromThriftType(op.Type))
-	//
-	// 	// Inject the prefix variables into the FContext to send
-	// 	for _, prefixVar := range scope.Prefix.Variables {
-	// 		publisher += fmt.Sprintf("\tctx.AddRequestHeader(\"_topic_%s\", %s)\n", prefixVar, prefixVar)
-	// 	}
-	//
-	// 	publisher += fmt.Sprintf("\top := \"%s\"\n", op.Name)
-	// 	publisher += fmt.Sprintf("\tprefix := %s\n", generatePrefixStringTemplate(scope))
-	// 	publisher += "\ttopic := fmt.Sprintf(\"%s" + scopeTitle + "%s%s\", prefix, delimiter, op)\n"
-	// 	publisher += "\tbuffer := frugal.NewTMemoryOutputBuffer(p.transport.GetPublishSizeLimit())\n"
-	// 	publisher += "\toprot := p.protocolFactory.GetProtocol(buffer)\n"
-	// 	publisher += "\tif err := oprot.WriteRequestHeader(ctx); err != nil {\n"
-	// 	publisher += "\t\treturn err\n"
-	// 	publisher += "\t}\n"
-	// 	publisher += "\tif err := oprot.WriteMessageBegin(op, thrift.CALL, 0); err != nil {\n"
-	// 	publisher += "\t\treturn err\n"
-	// 	publisher += "\t}\n"
-	// 	publisher += g.generateWriteFieldRec(parser.FieldFromType(op.Type, ""), "req")
-	// 	publisher += "\tif err := oprot.WriteMessageEnd(); err != nil {\n"
-	// 	publisher += "\t\treturn err\n"
-	// 	publisher += "\t}\n"
-	// 	publisher += "\tif err := oprot.Flush(); err != nil {\n"
-	// 	publisher += "\t\treturn err\n"
-	// 	publisher += "\t}\n"
-	// 	publisher += "\treturn p.transport.Publish(topic, buffer.Bytes())\n"
-	// 	publisher += "}\n"
-	return publisher
 }
 
 func generatePrefixStringTemplate(scope *parser.Scope) string {
