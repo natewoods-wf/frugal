@@ -199,79 +199,6 @@ func (c *{{title $.Name}}Client) {{template "func" .}} {
 		{{end -}}
 	{{end -}}
 }
-
-// {{$.Name}}{{title .Name}}Args are the arguments to {{title .Name}} calls.
-type {{$.Name}}{{title .Name}}Args struct {
-	{{range .Arguments -}}
-	{{title .Name}} {{go .Type}}
-	{{end -}}
-}
-
-// Pack serializes {{$.Name}}{{title .Name}}Args objects.
-func (p *{{$.Name}}{{title .Name}}Args) Pack(prot frugal.Protocol) {
-  prot.PackStructBegin("{{$.Name}}{{title .Name}}Args")
-	{{range .Arguments}}{{packField .}}{{end -}}
-	prot.PackFieldStop()
-  prot.PackStructEnd()
-}
-
-// Unpack deserializes {{$.Name}}{{title .Name}}Args objects.
-func (p *{{$.Name}}{{title .Name}}Args) Unpack(prot frugal.Protocol) {
-	prot.UnpackStructBegin("{{$.Name}}{{title .Name}}Args")
-	for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
-		switch id {
-		{{range .Arguments -}}
-		case {{.ID}}:
-			{{unpackField . -}}
-		{{end -}}
-		default:
-			prot.Skip(typeID)
-		}
-		prot.UnpackFieldEnd()
-	}
-	prot.UnpackStructEnd()
-}
-
-{{if not .Oneway}}
-// {{$.Name}}{{title .Name}}Result is the response to {{title .Name}} calls.
-type {{$.Name}}{{title .Name}}Result struct {
-	{{if .ReturnType}}Success {{go .ReturnType}}{{end}}
-	{{range .Exceptions -}}
-	{{title .Name}} {{go .Type}}
-	{{end -}}
-}
-
-// Pack serializes {{$.Name}}{{title .Name}}Result objects.
-func (p *{{$.Name}}{{title .Name}}Result) Pack(prot frugal.Protocol) {
-  prot.PackStructBegin("{{$.Name}}{{title .Name}}Result")
-	{{packSuccess .ReturnType -}}
-	{{range .Exceptions}}{{packField .}}{{end -}}
-	prot.PackFieldStop()
-  prot.PackStructEnd()
-}
-
-// Unpack deserializes {{$.Name}}{{title .Name}}Result objects.
-func (p *{{$.Name}}{{title .Name}}Result) Unpack(prot frugal.Protocol) {
-	prot.UnpackStructBegin("{{$.Name}}{{title .Name}}Result")
-	for typeID, id := prot.UnpackFieldBegin(); typeID != frugal.STOP; typeID, id = prot.UnpackFieldBegin() {
-		switch id {
-		{{if .ReturnType -}}
-		case 0:
-			{{unpackSuccess .ReturnType -}}
-		{{end -}}
-		{{range .Exceptions -}}
-		case {{.ID}}:
-			{{unpackField . -}}
-		{{end -}}
-		default:
-			prot.Skip(typeID)
-		}
-		prot.UnpackFieldEnd()
-	}
-	prot.UnpackStructEnd()
-}
-{{end -}}
-
 {{end -}}
 
 // {{title .Name}}Processor is the client.
@@ -354,18 +281,6 @@ func (g *Generator) SetupGenerator(outputDir string) error {
 		"packField": func(field *parser.Field) string {
 			return g.generateWriteFieldRec(field, "p.")
 		},
-		"unpackSuccess": func(t *parser.Type) string {
-			return g.generateReadFieldRec(&parser.Field{
-				Name: "success",
-				Type: t,
-			}, true)
-		},
-		"packSuccess": func(t *parser.Type) string {
-			return g.generateWriteFieldRec(&parser.Field{
-				Name: "success",
-				Type: t,
-			}, "p.")
-		},
 	}
 	g.structTPL, err = template.New("struct").Funcs(funcMap).Parse(structTemplate)
 	if err != nil {
@@ -384,7 +299,9 @@ func (g *Generator) SetupGenerator(outputDir string) error {
 
 // TeardownGenerator cleanups globals the generator needs, like the types file.
 func (g *Generator) TeardownGenerator() error {
-	defer g.typesFile.Close()
+	if err := g.typesFile.Close(); err != nil { // write pending changes to disk
+		return err
+	}
 	return g.PostProcess(g.typesFile)
 }
 
@@ -733,7 +650,7 @@ func (g *Generator) generateReadFieldRec(field *parser.Field, first bool) string
 			contents += "\t}\n\t}\n"
 			contents += "\tprot.UnpackListEnd()\n"
 		case "set":
-			panic("sets not supported yet")
+			contents += fmt.Sprintf("\t// TODO: sets! %s\n", fName)
 		case "map":
 			contents += "\tsize := prot.UnpackMapBegin()\n"
 			if !isPointerField {
@@ -826,7 +743,7 @@ func (g *Generator) generateWriteFieldRec(field *parser.Field, prefix string) st
 			contents += "\t}\n"
 			contents += fmt.Sprintf("\tprot.PackListEnd(%d)\n", field.ID)
 		case "set":
-			panic("sets not implemented")
+			contents += fmt.Sprintf("\t// TODO: sets %s\n", prefix+fName)
 		case "map":
 			keyEnumType := g.getEnumFromThriftType(underlyingType.KeyType)
 			contents += fmt.Sprintf("\tprot.PackMapBegin(%q, %d, %s, %s, len(%s))\n", field.Name, field.ID, keyEnumType, valEnumType, prefix+fName)
@@ -1268,7 +1185,16 @@ func (g *Generator) generateSubscribeMethod(scope *parser.Scope, op *parser.Oper
 
 // GenerateService generates the given service.
 func (g *Generator) GenerateService(file *os.File, s *parser.Service) error {
-	return g.serviceTPL.Execute(file, s)
+	if err := g.serviceTPL.Execute(file, s); err != nil {
+		return err
+	}
+	for _, typ := range g.GetServiceMethodTypes(s) {
+		typ.Name = title(s.Name) + title(typ.Name) // prepend service to type name
+		if err := g.structTPL.Execute(file, typ); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (g *Generator) getServiceExtendsNamespace(service *parser.Service) string {
