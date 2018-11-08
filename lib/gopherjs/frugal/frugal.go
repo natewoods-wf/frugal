@@ -5,6 +5,18 @@ type Packer interface {
 	Pack(Protocol)
 }
 
+type packerFunc func(Protocol)
+
+func (p packerFunc) Pack(prot Protocol) { p(prot) }
+
+// NewPackerFunc creates a new packer from a function.
+// This is necessary due to the way pubsub was initially implemented.
+// If the object being provided is already a packer, we can pass that to CallFunc without changes.
+// But! primitive types are written to the protocol without a struct wrapper.
+// Meaning we must have non-struct wrapped packing enabled for publish events.
+// Thus, the generator creates custom packers for non-typed publish events.
+func NewPackerFunc(packer func(Protocol)) Packer { return packerFunc(packer) }
+
 // Unpacker ...
 type Unpacker interface {
 	Unpack(Protocol)

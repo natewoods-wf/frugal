@@ -31,11 +31,15 @@ func (p *eventsPublisher) PublishEventCreated(ctx frugal.Context, user string, r
 }
 
 func (p *eventsPublisher) PublishSomeInt(ctx frugal.Context, user string, req int64) error {
-	return p.call(ctx, "foo."+user+".Events", "SomeInt", req, nil)
+	return p.call(ctx, "foo."+user+".Events", "SomeInt", frugal.NewPackerFunc(func(prot frugal.Protocol) {
+		// TODO: pack the req
+	}), nil)
 }
 
 func (p *eventsPublisher) PublishSomeStr(ctx frugal.Context, user string, req string) error {
-	return p.call(ctx, "foo."+user+".Events", "SomeStr", req, nil)
+	return p.call(ctx, "foo."+user+".Events", "SomeStr", frugal.NewPackerFunc(func(prot frugal.Protocol) {
+		// TODO: pack the req
+	}), nil)
 }
 
 func (p *eventsPublisher) PublishSomeList(ctx frugal.Context, user string, req []map[ID]*Event) error {

@@ -279,7 +279,13 @@ func New{{title .Name}}Publisher(call frugal.CallFunc) {{title .Name}}Publisher 
 
 {{range .Operations}}
 func (p *{{lower $.Name}}Publisher) Publish{{title .Name}}(ctx frugal.Context, {{template "args" $}}req {{go .Type}}) error {
-	return p.call(ctx, "{{if $.Prefix}}{{$.Prefix.String}}.{{end}}{{$.Name}}", "{{.Name}}", req, nil)
+	{{if prim .Type -}}
+		return p.call(ctx, "{{if $.Prefix}}{{$.Prefix.String}}.{{end}}{{$.Name}}", "{{.Name}}", frugal.NewPackerFunc(func(prot frugal.Protocol) {
+			// TODO: pack the req
+		}), nil)
+	{{else -}}
+		return p.call(ctx, "{{if $.Prefix}}{{$.Prefix.String}}.{{end}}{{$.Name}}", "{{.Name}}", req, nil)
+	{{end -}}
 }
 {{end}}
 `
